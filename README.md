@@ -1,7 +1,7 @@
 # jsPicLib
 a small picture processor on html
 ## demo
-index.html
+[demo](https://madderscientist.github.io/jsPicLib/)
 
 ## feature
 To process image on html, we use ImageData from html-canvas. However, ImageData saves all 4 channels, which sometimes is useless, especially when it's converted to grayscale image —— only one channel is needed, and three channels are same. But we still need to maintain the useless information in algorithm, which increases time and space complexity.<br>
