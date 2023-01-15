@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="./jsPic.js"></script>
+    <script src="./ImageData.js"></script>
+    <title>Score</title>
+</head>
+<script>
+    // html操作本地图片方法: 用FileReader读取, 用img加载, 用画布获得像素信息
+    var c = null;
+    var ctx = null;
+    var imgData = null;
+    window.onload = function () {     // body上面的script比body先加载, 其中的getelement必须等页面加载完才能成功
+        c = document.getElementById('picShow')
+        ctx = c.getContext('2d')
+    }
+    function receivePic(file) {     // 把图片画到画布上，获取图片信息
+        var fin = new FileReader();
+        fin.onload = function () {
+            if (FileReader.DONE == fin.readyState) {
+                var img = new Image();      // 浅看了一下js垃圾回收 只create但不加入dom树, 随CG一起回收 appendChild之后挂到dom上就不会回收, 直到remove了
+                img.onload = function () {   // 注意这里不能用 ()=>{} function的this随环境变化而变化, 但箭头函数的this始终为父对象(这里是上级函数)
+                    c.width = this.width;
+                    c.height = this.height;
+                    ctx.drawImage(img, 0, 0, this.width, this.height);
+                    imgData = ctx.getImageData(0, 0, this.width, this.height)
+                }
+                img.src = fin.result;
+            }
+        }
+        fin.readAsDataURL(file);
+    }
+</script>
+
+<body>
+    <input type="file" accept="image/*" onchange="receivePic(this.files[0])">
+    <button onclick="EdgeExtraction()">jsPic edge extraction</button>
+    <button onclick="EdgeExtraction2()">ImageData edge extraction</button>
+    <button onclick="horizontalLine()">jsPic horizontal line</button>
+    <button onclick="horizontalLine2()">ImageData horizontal line</button>
+    time used is printed in console.
+    <br>
+    <canvas id="picShow"></canvas>
+</body>
+<script>
+    function EdgeExtraction() {
+        console.time('Edge extraction');
+        var d = new jsPic().fromImageData(imgData,'L');
+        let setting = {
+            kernel: jsPic.Laplacian,
+            picfun: (x=>Math.abs(x)>200?255:0),
+            padding: [1,1]
+        }
+        d = d.convolution(setting);
+        ctx.putImageData(d.toImageData([0,0,0,-1]), 0, 0);
+        console.timeEnd('Edge extraction')
+    }
+    function EdgeExtraction2(){
+        console.time('Edge extraction2')
+        let kernel = jsPic.Laplacian;
+        convert(imgData, 'L')
+        ctx.putImageData(convolution(imgData, kernel, 1, 1,[127,127,127,0],(x=>Math.abs(x)>150?255:0)), 0, 0);
+        console.timeEnd('Edge extraction2')
+    }
+
+    function horizontalLine() {
+        console.time('horizontal Line');
+        var d = new jsPic().fromImageData(imgData,'1',220);
+        let setting = {
+            kernel: [[0.3, 0.2, 0.1, 0, 0.1, 0.2, 0.3]],
+            padding: [3,0]
+        }
+        d = d.convolution(setting);
+        d = d.convolution(setting);
+        d = d.convolution(setting);
+        ctx.putImageData(d.convert('1',2).toImageData([0,0,0,-1]), 0, 0);
+        console.timeEnd('horizontal Line')
+    }
+    function horizontalLine2() {
+        console.time('horizontal Line2')
+        let kernel = [[0.3, 0.2, 0.1, 0, 0.1, 0.2, 0.3]];
+        convert(imgData, '1', 220)
+        // 经测试得出要三次
+        imgData = convolution(imgData, kernel, 1, [3, 0]);
+        imgData = convolution(imgData, kernel, 1, [3, 0]);
+        imgData = convolution(imgData, kernel, 1, [3, 0]);
+        convert(imgData, '1', 2)
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd('horizontal Line2')
+    }
+</script>
+
+</html>
