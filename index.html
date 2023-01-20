@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 
 <head>
     <meta charset="UTF-8">
@@ -8,27 +8,82 @@
     <script src="./jsPic.js"></script>
     <title>Score</title>
 </head>
+<style>
+    body {
+        background-color: lightcoral;
+    }
+
+    .parent {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: 1fr;
+        grid-column-gap: 0px;
+        grid-row-gap: 0px;
+    }
+
+    .btns {
+        grid-area: 1 / 1 / 2 / 2;
+    }
+
+    .showPic {
+        grid-area: 1 / 2 / 2 / 3;
+    }
+
+    input[type=text] {
+        height: 25px;
+        margin: 5px;
+        border-radius: 10px;
+        border: none;
+        padding: 2px 14px;
+        width: 40px;
+        text-align: center;
+    }
+
+    button {
+        height: 40px;
+        border-radius: 10px;
+        border: 1 solid;
+        margin: 5px;
+    }
+
+    .card {
+        background-color: rgb(248, 248, 228);
+        border-radius: 16px;
+        box-shadow: 5px 5px 5px 0px rgba(0, 0, 0, 0.5);
+        line-height: 20px;
+        margin: 10px;
+        padding: 10px 20px;
+        width: 320px;
+    }
+</style>
 <script>
     // html操作本地图片方法: 用FileReader读取, 用img加载, 用画布获得像素信息
     var c = null;
     var ctx = null;
     var imgData = null;
+    var imgsrc = null;
     window.onload = function () {     // body上面的script比body先加载, 其中的getelement必须等页面加载完才能成功
         c = document.getElementById('picShow')
         ctx = c.getContext('2d')
+        imgToCanvas('./testPic.png')
+    }
+    function imgToCanvas(SRC) {
+        var img = new Image();      // 浅看了一下js垃圾回收 只create但不加入dom树, 随CG一起回收 appendChild之后挂到dom上就不会回收, 直到remove了
+        img.onload = function () {   // 注意这里不能用 ()=>{} function的this随环境变化而变化, 但箭头函数的this始终为父对象(这里是上级函数)
+            c.width = this.width;
+            c.height = this.height;
+            ctx.drawImage(img, 0, 0, this.width, this.height);
+            imgData = ctx.getImageData(0, 0, this.width, this.height);
+            document.getElementById('size').innerHTML = `width: ${this.width}, height: ${this.height}`;
+        }
+        img.src = SRC;
+        imgsrc = SRC;
     }
     function receivePic(file) {     // 把图片画到画布上，获取图片信息
         var fin = new FileReader();
         fin.onload = function () {
             if (FileReader.DONE == fin.readyState) {
-                var img = new Image();      // 浅看了一下js垃圾回收 只create但不加入dom树, 随CG一起回收 appendChild之后挂到dom上就不会回收, 直到remove了
-                img.onload = function () {   // 注意这里不能用 ()=>{} function的this随环境变化而变化, 但箭头函数的this始终为父对象(这里是上级函数)
-                    c.width = this.width;
-                    c.height = this.height;
-                    ctx.drawImage(img, 0, 0, this.width, this.height);
-                    imgData = ctx.getImageData(0, 0, this.width, this.height)
-                }
-                img.src = fin.result;
+                imgToCanvas(fin.result)
             }
         }
         fin.readAsDataURL(file);
@@ -36,49 +91,127 @@
 </script>
 
 <body>
-    <input type="file" accept="image/*" onchange="receivePic(this.files[0]);this.value = '';">
-    <button onclick="EdgeExtraction()">jsPic edge extraction</button>
-    <button onclick="EdgeExtraction2()">ImageData edge extraction</button>
-    <button onclick="horizontalLine()">jsPic horizontal line</button>
-    <button onclick="horizontalLine2()">ImageData horizontal line</button>
-    time used is printed in console.
-    <br>
-    <canvas id="picShow"></canvas>
+    <div class="parent">
+        <div class="btns">
+            <input type="file" accept="image/*" onchange="receivePic(this.files[0]);this.value = '';"><br>
+            <button onclick="origin()">show origin</button>
+            <button onclick="toGrey()">to Grey</button>
+            <button onclick="to01()">Binarization</button>
+            <button onclick="inverseGrey()">inverse Grey</button>
+            <button onclick="Gblur()">Gaussian blur</button>
+            <div class="card">
+                <b>Brighten:</b><br>
+                extent:<input type="text" name="Brighten" placeholder="1->still" value="2"><button onclick="GammaB()">Brighten(Gamma)</button><br>
+                extent:<input type="text" name="Brighten" placeholder="1->still" value="0.7"><button onclick="HSVB()">Brightness(HSV)</button>
+            </div>
+            <div class="card">
+                <b>edge extraction:</b><br>
+                <button onclick="EdgeExtraction()">jsPic edge extraction</button>
+                <button onclick="EdgeExtraction2()">ImageData edge extraction</button>
+                <br>using jsPic is much quicker
+            </div>
+            <div class="card">
+                <b>find the horizontal lines:</b><br>
+                <button onclick="horizontalLine()">jsPic horizontal line</button>
+                <button onclick="horizontalLine2()">ImageData horizontal line</button>
+                <br>using jsPic is much quicker
+            </div>
+            <div class="SHough card">
+                <b>Standard Hough Transform (Line Detect):</b><br>
+                <font color="#FF0000">please edge extraction first!</font><br>
+                threshold: <input type="text" name="SHough" placeholder="about width/3" value="200"><br>
+                length accuracy: <input type="text" name="SHough" placeholder="int or decimal" value="1"><br>
+                angle accuracy: <input type="text" name="SHough" placeholder="int or decimal" value="1"><br>
+                <button onclick="hough()">Standard Hough Transform</button>
+            </div>
+            <div class="PPHT card">
+                <b>Progressive Probabilistic Hough Transform (Line Detect):</b><br>
+                <font color="#FF0000">please edge extraction first!</font><br>
+                threshold: <input type="text" name="PPHT" placeholder="about width/3" value="200"><br>
+                lineLength: <input type="text" name="PPHT" placeholder="int, similar to threshold" value="200"><br>
+                lineGap: <input type="text" name="PPHT" placeholder="int" value="5"><br>
+                length accuracy: <input type="text" name="PPHT" placeholder="int or decimal" value="2"><br>
+                angle accuracy: <input type="text" name="PPHT" placeholder="int or decimal" value="1"><br>
+                <button onclick="houghp()">Progressive Probabilistic Hough Transform</button>
+            </div>
+            time used is printed in console.
+            <br>
+        </div>
+        <div class="showPic">
+            <canvas id="picShow"></canvas>
+            <p id="size"></p>
+        </div>
+    </div>
 </body>
 <script>
+    function origin(){
+        imgToCanvas(imgsrc)
+    }
+    function toGrey() {
+        console.time('to Grey');
+        convert(imgData)
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd('to Grey');
+    }
+    function to01() {
+        console.time('Binarization');
+        convert(imgData, '1')
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd('Binarization');
+    }
+    function inverseGrey() {
+        console.time('inverse Grey');
+        var d = new jsPic().fromImageData(imgData, 'L');
+        d.throughChannel(0, x => 255 - x);
+        imgData = d.toImageData([0, 0, 0, -1]);
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd('inverse Grey');
+    }
     function EdgeExtraction() {
         console.time('Edge extraction');
-        var d = new jsPic().fromImageData(imgData,'L');
+        var d = new jsPic().fromImageData(imgData, 'L');
         let setting = {
             kernel: jsPic.Laplacian,
-            picfun: (x=>Math.abs(x)>200?255:0),
-            padding: [1,1]
+            fill: [-1],     // 用临近点填充
+            pixfun: (x => Math.abs(x) > 127 ? 255 : 0),
+            padding: [1, 1]
         }
         d = d.convolution(setting);
-        imgData = d.toImageData([0,0,0,-1]);
+        imgData = d.toImageData([0, 0, 0, -1]);
         ctx.putImageData(imgData, 0, 0);
-        console.timeEnd('Edge extraction')
+        console.timeEnd('Edge extraction');
     }
-    function EdgeExtraction2(){
+    function EdgeExtraction2() {
         console.time('Edge extraction2')
         let kernel = jsPic.Laplacian;
         convert(imgData, 'L')
-        imgData = convolution(imgData, kernel, 1, 1,[127,127,127,0],(x=>Math.abs(x)>150?255:0));
+        imgData = convolution(imgData, kernel, 1, 1, [127, 127, 127, 0], (x => Math.abs(x) > 150 ? 255 : 0));
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('Edge extraction2')
     }
-
+    function Gblur() {
+        console.time('Gaussian blur');
+        var d = new jsPic().fromImageData(imgData);
+        let setting = {
+            kernel: jsPic.Gaussian,
+            padding: [1, 1]
+        }
+        d = d.convolution(setting);
+        imgData = d.toImageData([0, 1, 2, 3]);
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd('Gaussian blur')
+    }
     function horizontalLine() {
         console.time('horizontal Line');
-        var d = new jsPic().fromImageData(imgData,'1',220);
+        var d = new jsPic().fromImageData(imgData, '1', 220);
         let setting = {
             kernel: [[0.3, 0.2, 0.1, 0, 0.1, 0.2, 0.3]],
-            padding: [3,0]
+            padding: [3, 0]
         }
         d = d.convolution(setting);
         d = d.convolution(setting);
         d = d.convolution(setting);
-        imgData = d.convert('1',2).toImageData([0,0,0,-1]);
+        imgData = d.convert('1', 2).toImageData([0, 0, 0, -1]);
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('horizontal Line')
     }
@@ -93,6 +226,52 @@
         convert(imgData, '1', 2)
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('horizontal Line2')
+    }
+    function GammaB(){
+        console.time('brighten(HSV)');
+        var d = new jsPic().fromImageData(imgData);
+        d.brighten('gamma',parseFloat(document.getElementsByName('Brighten')[0].value));
+        imgData = d.toImageData([0, 1, 2, -1]);
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd('brighten(HSV)');
+    }
+    function HSVB(){
+        console.time('brighten(HSV)');
+        var d = new jsPic().fromImageData(imgData);
+        d.brighten('hsb',parseFloat(document.getElementsByName('Brighten')[1].value));
+        imgData = d.toImageData([0, 1, 2, -1]);
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd('brighten(HSV)');
+    }
+    function hough() {
+        let inputs = document.getElementsByName('SHough');
+        console.time('hough');
+        var d = new jsPic().fromImageData(imgData, '1', 200);
+        let [k, b] = d.Hough(0, parseFloat(inputs[0].value), parseFloat(inputs[1].value), parseFloat(inputs[2].value));
+        for (let i = 0; i < k.length; i++) {
+            ctx.moveTo(0, b[i]);
+            ctx.lineTo(c.width, c.width * k[i] + b[i]);
+        }
+        ctx.strokeStyle = '#00ff00';
+        ctx.stroke();
+        console.timeEnd('hough');
+    }
+    function houghp() {
+        var inputs = document.getElementsByName('PPHT');
+        console.time('houghp');
+        var d = new jsPic().fromImageData(imgData, '1');
+        let ps = d.HoughP(0, parseFloat(inputs[0].value), parseFloat(inputs[1].value), parseFloat(inputs[2].value), parseFloat(inputs[3].value), parseFloat(inputs[4].value));
+        console.log("result:",ps);
+        let colors = ['#f0f000', '#00ff00', '#00ffff']
+        ctx.lineWidth = 3
+        for (let i = 0; i < ps.length; i++) {
+            ctx.beginPath()
+            ctx.moveTo(ps[i][0][0], ps[i][0][1]);
+            ctx.lineTo(ps[i][1][0], ps[i][1][1]);
+            ctx.strokeStyle = colors[Math.floor(Math.random() * 3)];
+            ctx.stroke();
+        }
+        console.timeEnd('houghp');
     }
 </script>
 

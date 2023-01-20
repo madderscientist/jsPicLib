@@ -17,12 +17,12 @@
  */
 class jsPic {
     // useful kernels
-    static Gaussian = [[0.0625,0.125,0.0625],[0.125,0.25,0.125],[0.0625,0.125,0.0625]]
-    static Prewitt_H = [[-1,0,1],[-1,0,1],[-1,0,1]]
-    static Prewitt_V = [[-1,-1,-1],[0,0,0],[1,1,1]]
-    static Sobel_H = [[-1,0,1],[-2,0,2],[-1,0,1]]
-    static Sobel_V = [[-1,-2,-1],[0,0,0],[1,2,1]]
-    static Laplacian = [[-1,-1,-1],[-1,8,-1],[-1,-1,-1]]
+    static Gaussian = [[0.0625, 0.125, 0.0625], [0.125, 0.25, 0.125], [0.0625, 0.125, 0.0625]]
+    static Prewitt_H = [[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]]
+    static Prewitt_V = [[-1, -1, -1], [0, 0, 0], [1, 1, 1]]
+    static Sobel_H = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]
+    static Sobel_V = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]]
+    static Laplacian = [[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]]
 
     /**
      * new a jsPic from param
@@ -32,11 +32,11 @@ class jsPic {
      * @param {Int8Array} fill fill[i] = channel{i}'s default value (only used when 'channel' is a number)
      * @returns {jsPic} overwirte and return itself
      */
-    new(width, height, channel = 4, fill = [255,255,255,255]) {
+    new(width, height, channel = 4, fill = [255, 255, 255, 255]) {
         this.width = width;
         this.height = height;
         if (Array.isArray(channel)) this.channel = channel;
-        else this.channel = Array.from({length:channel},(_,i)=>{this.newChannel(fill[i]);});
+        else this.channel = Array.from({ length: channel }, (_, i) => { this.newChannel(fill[i]); });
         return this;
     }
 
@@ -57,14 +57,14 @@ class jsPic {
      * @param {number} channel target channel index
      * @returns {Array} copy
      */
-    cloneChannel(channel) {return Array.from(this.channel[channel], (line) => new Uint8ClampedArray(line));}
+    cloneChannel(channel) { return Array.from(this.channel[channel], (line) => new Uint8ClampedArray(line)); }
 
     /**
      * deeply clone a jsPic
      * @returns {jsPic} copy
      */
-    clone() {return new jsPic().new(this.width, this.height, Array.from(this.channel, (_, index) => this.cloneChannel(index)));}
-    
+    clone() { return new jsPic().new(this.width, this.height, Array.from(this.channel, (_, index) => this.cloneChannel(index))); }
+
     /**
      * get a pixel at (x,y)
      * @param {number} x
@@ -72,7 +72,7 @@ class jsPic {
      * @returns {Array} [channel_1, channel_2, ... ]
      */
     getPixel(x, y) {
-        p = new Uint8ClampedArray(this.channel.length);
+        let p = new Uint8ClampedArray(this.channel.length);
         for (let i = 0; i < this.channel.length; i++) p[i] = this.channel[i][y][x];
         return p;
     }
@@ -151,7 +151,7 @@ class jsPic {
         }
         return this;
     }
-    
+
     /**
      * construct ImageData from jsPic
      * @param {Array} select select 4 channels to form ImageData, ImageData's channel[i] = this.channel[select[i]]
@@ -226,11 +226,12 @@ class jsPic {
      * @param {number} channel target channel index
      * @param {*} threshold 
      */
-    convert_1(channel, threshold = 127) {this.throughChannel(channel, (x) => { return x > threshold ? 255 : 0; });}
+    convert_1(channel, threshold = 127) { this.throughChannel(channel, (x) => { return x > threshold ? 255 : 0; }); }
 
     /**
      * convoluion on selected channels
-     * @param {Object} setting {kernel:Array(n*n), stride:Array(2), padding:Array(2), fill:Array(channel.length), pixfun:Function, select:Array} 
+     * @param {Object} setting {kernel:Array(n*n), stride:Array(2), padding:Array(2), fill:Array(channel.length), pixfun:Function, select:Array}
+     * @description if fill[i] < 0, the nearliest pixel value will be used
      * @returns new jsPic
      */
     convolution({ kernel, stride = [1, 1], padding = [0, 0], fill = [127, 127, 127, 0], pixfun = x => { return x; }, select = [0, 1, 2] }) {
@@ -239,7 +240,7 @@ class jsPic {
         let newHeight = Math.floor((this.height + 2 * padding[1] - kernelH) / stride[1] + 1);
         let newWidth = Math.floor((this.width + 2 * padding[0] - kernelW) / stride[0] + 1);
         let C = new Array(this.channel.length);
-        for (let c = 0; c < this.channel.length; c++) {
+        for (let c = 0; c < this.channel.length; c++) {     // 如果select比channel多, 用前几个数字
             let i = select.indexOf(c);
             if (i != -1) {
                 let cha = new Array(newHeight);
@@ -252,7 +253,17 @@ class jsPic {
                             for (let ww = 0; ww < kernelW; ww++) {
                                 let kh = h + hh;
                                 let kw = w + ww;
-                                let value = (kw < 0 || kw >= this.width || kh < 0 || kh >= this.height) ? fill[i] : this.channel[c][kh][kw];
+                                let value = fill[i];
+                                let wjudge = kw < 0 || kw >= this.width;
+                                let hjudge = kh < 0 || kh >= this.height
+                                if (wjudge || hjudge) {
+                                    if (value < 0) {    // 找最近的图片点
+                                        let vw = kw, vh = kh;
+                                        if (wjudge) vw = Math.min(Math.max(0, kw), this.width - 1);
+                                        if (hjudge) vh = Math.min(Math.max(0, kh), this.height - 1);
+                                        value = this.channel[c][vh][vw];
+                                    }
+                                } else value = this.channel[c][kh][kw];
                                 sum += value * kernel[hh][ww];
                             }
                         } L[W] = pixfun(sum);
@@ -270,30 +281,172 @@ class jsPic {
      * @param {Array} channels target channels' index
      * @returns {jsPic | null} change and return itself when succeeded. otherwise null
      */
-    brighten(mode = 'gamma', extent = 1, channels = [0,1,2]) {
-        switch(mode){
+    brighten(mode = 'gamma', extent = 1, channels = [0, 1, 2]) {
+        switch (mode) {
             case 'gamma':
-                extent = 1/extent;
-                let gammaMap = Array.from({length:256},(_,i)=>255 * Math.pow(i / 255, extent));
-                for(let i=0;i<channels.length;i++) this.throughChannel(i,x=>gammaMap[x]);
+                extent = 1 / extent;
+                let gammaMap = Array.from({ length: 256 }, (_, i) => 255 * Math.pow(i / 255, extent));
+                for (let i = 0; i < channels.length; i++) this.throughChannel(i, x => gammaMap[x]);
                 return this;
             case 'hsb':
-                if(this.channel.length<3||channels.length!=3) break;
-                return this.throughPic((pixel)=>{
-                    let hsb = rgbToHsb([pixel[channels[0]],pixel[channels[1]],pixel[channels[2]]]);
-                    hsb[2] = Math.min(100, hsb[2] * x);
+                if (this.channel.length < 3 || channels.length != 3) break;
+                return this.throughPic((pixel) => {
+                    let hsb = rgbToHsb([pixel[channels[0]], pixel[channels[1]], pixel[channels[2]]]);
+                    hsb[2] = Math.min(100, hsb[2] * extent);
                     let result = hsbToRgb(hsb);
-                    for(let c=0;c<3;c++) pixel[channels[c]] = result[c];
+                    for (let c = 0; c < 3; c++) pixel[channels[c]] = result[c];
                     return pixel;
                 });
             case 'linear':
-                for(let c=0;c<channels.length;c++){
-                    this.throughChannel(channels[c],x=>extent*x);
+                for (let c = 0; c < channels.length; c++) {
+                    this.throughChannel(channels[c], x => extent * x);
                     return this;
                 }
             default: console.error("unknown mode!"); return null;
         }
         console.error("channel number error!"); return null;
+    }
+
+    Hough(channel = 0, threshold = 95, rho = 1, theta = 1) {
+        rho = 1 / rho;
+        channel = this.channel[channel];
+        // 获取cos sin取值表 0~180
+        let thetaL = parseInt(180 / theta); // 横轴长度
+        theta = Math.PI / 180 * theta;
+        let sinMap = new Float32Array(thetaL);
+        let cosMap = new Float32Array(thetaL);
+        if (theta == Math.PI / 180) {     // 速度上小小的优化
+            for (let i = 0, angle = 0; i < 90; i++, angle += theta) {
+                let value = Math.cos(angle);
+                sinMap[i + 90] = sinMap[90 - i] = cosMap[i] = value * rho;// js特性: 越界赋值不报错也不成功
+                cosMap[180 - i] = -value * rho;
+            }
+        } else {
+            for (let i = 0, angle = 0; i < thetaL; i++, angle += theta) {
+                sinMap[i] = Math.sin(angle) * rho;
+                cosMap[i] = Math.cos(angle) * rho;
+            }
+        }
+        // 投票数组
+        let rmax = Math.round(Math.max(this.width, this.height) * rho);
+        let Rrange = Math.round(Math.sqrt(Math.pow(this.width, 2) + Math.pow(this.height, 2)) * rho) + rmax + 1;
+        let lineArea = new Uint16Array(Rrange * thetaL);
+        // theta - x, r - y
+        for (let h = 0; h < this.height; h++) {
+            for (let w = 0; w < this.width; w++) {
+                if (channel[h][w] != 255) continue;
+                for (let theta = 0; theta < thetaL; theta++) {
+                    let r = Math.round(w * cosMap[theta] + h * sinMap[theta]) + rmax;
+                    lineArea[thetaL * r + theta]++;
+                }
+            }
+        }
+        let ok = new Array();
+        for (let i = 0; i < lineArea.length; i++)
+            if (lineArea[i] > threshold) ok.push(i);
+        let k = new Array(ok.length);
+        let b = new Array(ok.length);
+        for (let i = 0; i < ok.length; i++) {
+            let theta = ok[i] % thetaL;
+            let r = parseInt(ok[i] / thetaL) - rmax;
+            k[i] = -cosMap[theta] / (sinMap[theta] + 0.0001);
+            b[i] = r / (sinMap[theta] + 0.0001);
+        }
+        return [k, b];
+    }
+
+    HoughP(channel = 0, threshold = 95, lineLength = 95, lineGap = 2, rho = 1, theta = 1) {
+        rho = 1 / rho;
+        let thetaL = parseInt(180 / theta);             // 横轴长度
+        theta = Math.PI / 180 * theta;                  // 弧度精度
+        let rmax = Math.round(Math.max(this.width, this.height) * rho);   // 负的最大距离
+        let rL = Math.round(Math.sqrt(Math.pow(this.width, 2) + Math.pow(this.height, 2)) * rho + rmax + 1);   // 纵轴长度
+        // 计算正余弦表
+        let sinMap = new Float32Array(thetaL);
+        let cosMap = new Float32Array(thetaL);
+        if (theta == Math.PI / 180) {     // 速度上小小的优化
+            for (let i = 0, angle = 0; i < 90; i++, angle += theta) {
+                let value = Math.cos(angle);
+                sinMap[i + 90] = sinMap[90 - i] = cosMap[i] = value * rho;
+                cosMap[180 - i] = -value * rho;
+            }
+        } else {
+            for (let i = 0, angle = 0; i < thetaL; i++, angle += theta) {
+                sinMap[i] = Math.sin(angle) * rho;
+                cosMap[i] = Math.cos(angle) * rho;
+            }
+        }
+        let lineArea = new Uint16Array(rL * thetaL);    // 霍夫空间 投票器
+
+        channel = this.channel[channel];
+        let flag = new Array(this.height);              // 状态矩阵
+        let edges = [];                                 // 列出所有边界点
+        let output = [];
+        for (let h = 0; h < this.height; h++) {
+            let aLine = new Uint8Array(this.width);
+            for (let w = 0; w < this.width; w++)
+                if ((aLine[w] = channel[h][w]) == 255) edges.push([w, h]);//就是单等号
+            flag[h] = aLine;
+        }
+
+        for (let count = edges.length; count > 0;) {
+            // Step1. 随机选点
+            let i = Math.floor(Math.random() * count);
+            let p = edges[i];               // [w,h]
+            edges[i] = edges[--count];      // 删除这个点: 覆盖
+            if (!flag[p[1]][p[0]]) continue;// 被处理过(已经属于其他直线)
+            // Step2. 投票
+            let max_vote = threshold - 1;
+            let max_x = 0;
+            for (let x = 0; x < thetaL; x++) {
+                let r = Math.round(p[0] * cosMap[x] + p[1] * sinMap[x]) + rmax;
+                let current_vote = ++lineArea[thetaL * r + x];
+                if (current_vote > max_vote) {
+                    max_vote = current_vote;
+                    max_x = x;
+                }
+            }
+            // Step3. 此点没有带来大于阈值的投票则下一个点
+            if (max_vote < threshold) continue;
+            // Step4. 从此点出发搜索端点
+            // 为了能检测水平和竖直必须选变化小的步长为1
+            let dx = 1, dy = 1;
+            let SIN = sinMap[max_x];
+            let COS = cosMap[max_x];
+            let endPoint = [[0, 0], [0, 0]];
+            if (SIN > Math.abs(COS))    // 在45~135°之间
+                dy = -COS / SIN;        // r=xcos(θ)+ysin(θ) => y=-cos/sin*x+r/sin
+            else                        // 直线较陡峭 应选取x步长为1
+                dx = -SIN / COS;
+            for (let k = 0; k < 2; k++, dx = -dx, dy = -dy) {
+                let GAP = 0;
+                for (let x0 = p[0], y0 = p[1]; ; y0 += dy, x0 += dx) {
+                    let inty = Math.round(y0), intx = Math.round(x0);
+                    if (inty < 0 || inty >= this.height || intx < 0 || intx >= this.width) break;
+                    if (flag[inty][intx] == 255) {     // 该点未被访问 在线上
+                        GAP = 0;
+                        endPoint[k][0] = x0;
+                        endPoint[k][1] = y0;
+                    } else if (++GAP > lineGap) break;
+                }
+            }
+            max_vote = Math.sqrt(Math.pow(endPoint[1][1] - endPoint[0][1], 2) + Math.pow(endPoint[1][0] - endPoint[0][0], 2)) >= lineLength;
+            // 第二次循环 更新flag和投票器
+            for (let k = 0; k < 2; k++, dx = -dx, dy = -dy) {
+                for (let x0 = p[0], y0 = p[1]; x0 != endPoint[k][0] || y0 != endPoint[k][1]; y0 += dy, x0 += dx) {
+                    let intx = Math.round(x0), inty = Math.round(y0);
+                    if (flag[inty][intx] == 255) {
+                        if (max_vote) {
+                            for (let a = 0; a < thetaL; a++)
+                                lineArea[thetaL * (Math.round(intx * cosMap[a] + inty * sinMap[a]) + rmax) + a]--;
+                        }
+                        flag[inty][intx] = 0;
+                    }
+                }
+            }
+            if (max_vote) output.push(endPoint);
+        }
+        return output;
     }
 }
 
@@ -319,9 +472,9 @@ function hsbToRgb(hsb) {
 function rgbToHsb(rgb) {
     let h = 0, s = 0, v = 0;
     let r = rgb[0], g = rgb[1], b = rgb[2];
-    arr.sort((a, b) => { return a - b; });
-    let max = arr[2];
-    let min = arr[0];
+    rgb.sort((a, b) => { return a - b; });
+    let max = rgb[2];
+    let min = rgb[0];
     v = max / 255;
     if (max === 0) s = 0;
     else s = 1 - (min / max);
@@ -358,7 +511,7 @@ function convert(ImgData, mode = 'L', threshold = 127) {
 }
 
 
-function convolution(ImgData, kernel, stride = 1, padding = 0, fill = [127, 127, 127, 0], pixfun = x=>{return x;}) {
+function convolution(ImgData, kernel, stride = 1, padding = 0, fill = [127, 127, 127, 0], pixfun = x => { return x; }) {
     let xStep, yStep
     if (Array.isArray(stride)) {
         xStep = stride[0];
