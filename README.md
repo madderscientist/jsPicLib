@@ -37,6 +37,8 @@ class jsPic: no constructor
 - convert_1
 - convolution
 - brighten
+- Hough(Standard Hough Transform)
+- HoughP(Progressive Probabilistic Hough Transform)
 
 also provided api based on ImageData:
 - convert
