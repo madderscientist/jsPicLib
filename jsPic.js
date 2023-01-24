@@ -36,7 +36,7 @@ class jsPic {
         this.width = width;
         this.height = height;
         if (Array.isArray(channel)) this.channel = channel;
-        else this.channel = Array.from({ length: channel }, (_, i) => { this.newChannel(fill[i]); });
+        else this.channel = Array.from({ length: channel }, (_, i) => this.newChannel(fill[i]));
         return this;
     }
 
@@ -45,7 +45,7 @@ class jsPic {
      * @param {number} fill default value
      * @returns {Array} a channel
      */
-    newChannel(fill) {
+    newChannel(fill = 0) {
         let Channel = new Array(this.height);
         for (let h = 0; h < this.height; h++)
             Channel[h] = new Uint8ClampedArray(this.width).fill(fill);
@@ -307,7 +307,88 @@ class jsPic {
         console.error("channel number error!"); return null;
     }
 
-    Hough(channel = 0, threshold = 95, rho = 1, theta = 1) {
+    /**
+     * resize via bilinear interpolation
+     * @param {number} w 
+     * @param {number} h 
+     * @returns a new jspic
+     */
+    resize(w, h) {
+        // 用双线性插值 映射法则: 放大的时候用点模型 缩小的时候用边模型
+        let pw = w < this.width ? this.width / w : (this.width - 1.5) / (w - 1);
+        let xmap = pw < 1 ? Array.from({ length: w }, (_, x) => x * pw) : Array.from({ length: w }, (_, x) => (x + 0.5) * pw - 0.5);
+        let xl = new Float32Array(w);
+        let xr = new Float32Array(w);
+        for (let i = 0; i < w; i++) {
+            let intx = Math.floor(xmap[i]);
+            xl[i] = xmap[i] - intx;
+            xr[i] = 1 - xl[i];
+            xmap[i] = intx;
+        }
+        let ph = h < this.height ? this.height / h : (this.height - 1.5) / (h - 1);
+        let ymap = ph < 1 ? Array.from({ length: h }, (_, y) => y * ph) : Array.from({ length: h }, (_, y) => (y + 0.5) * ph - 0.5);
+        let yl = new Float32Array(w);
+        let yr = new Float32Array(w);
+        for (let i = 0; i < h; i++) {
+            let inty = Math.floor(ymap[i]);
+            yl[i] = ymap[i] - inty;
+            yr[i] = 1 - yl[i];
+            ymap[i] = inty;
+        }
+        let output = new jsPic().new(w, h, this.channel.length);
+        console.log(output)
+        for (let c = 0; c < this.channel.length; c++) {
+            let ch = this.channel[c];
+            for (ph = 0; ph < h; ph++) {
+                for (pw = 0; pw < w; pw++) {
+                    output.channel[c][ph][pw] =
+                        xr[pw] * yr[ph] * ch[ymap[ph]][xmap[pw]] +          // 左上角
+                        xl[pw] * yl[ph] * ch[ymap[ph] + 1][xmap[pw] + 1] +  // 右下角
+                        xr[pw] * yl[ph] * ch[ymap[ph] + 1][xmap[pw]] +      // 左下角
+                        xl[pw] * yr[ph] * ch[ymap[ph]][xmap[pw] + 1];       // 右上角
+                }
+            }
+        }
+        return output;
+    }
+
+    /**
+     * Template Matching, using sum of squares of differences
+     * @param {jsPic} template template picture
+     * @param {number} ignorePix if template's pixel==ignorePix, it won't be calculated
+     * @returns error map
+     */
+    TemplateMatch(template, ignorePix = -1) {
+        let newW = this.width - template.width + 1;
+        let newH = this.height - template.height + 1;
+        let error = new Uint32Array(newH * newW);
+        for (let c = 0; c < this.channel.length; c++) {
+            let k = 0;
+            for (let h = 0; h < newH; h++) {
+                for (let w = 0; w < newW; w++, k++) {
+                    // 遍历模版
+                    for (let th = 0; th < template.height; th++) {
+                        for (let tw = 0; tw < template.width; tw++) {
+                            if (template.channel[c][th][tw] != ignorePix)
+                                error[k] += (template.channel[c][th][tw] - this.channel[c][h + th][w + tw]) ** 2;
+                        }
+                    }
+                }
+            }
+        }
+        return error;
+    }
+
+    /**
+     * Hough Transform
+     * @param {number} channel target channel index
+     * @param {number} threshold voter critical
+     * @param {number} rho r accuracy
+     * @param {number} theta θ accuracy
+     * @param {boolean} kb_line if return the k b of each line
+     * @returns [[k array],[b array]] if kb_line else [[θ array],[r array]]
+     */
+    Hough(channel = 0, threshold = 95, rho = 1, theta = 1, kb_line = true) {
         rho = 1 / rho;
         channel = this.channel[channel];
         // 获取cos sin取值表 0~180
@@ -346,15 +427,32 @@ class jsPic {
             if (lineArea[i] > threshold) ok.push(i);
         let k = new Array(ok.length);
         let b = new Array(ok.length);
-        for (let i = 0; i < ok.length; i++) {
-            let theta = ok[i] % thetaL;
-            let r = parseInt(ok[i] / thetaL) - rmax;
-            k[i] = -cosMap[theta] / (sinMap[theta] + 0.0001);
-            b[i] = r / (sinMap[theta] + 0.0001);
+        if (kb_line) {
+            for (let i = 0; i < ok.length; i++) {
+                let theta = ok[i] % thetaL;
+                let r = parseInt(ok[i] / thetaL) - rmax;
+                k[i] = -cosMap[theta] / (sinMap[theta] + 0.0001);
+                b[i] = r / (sinMap[theta] + 0.0001);
+            }
+        } else {
+            for (let i = 0; i < ok.length; i++) {
+                k[i] = ok[i] % thetaL;
+                b[i] = parseInt(ok[i] / thetaL) - rmax;
+            }
         }
         return [k, b];
     }
 
+    /**
+     * Progressive Probabilistic Hough Transform
+     * @param {number} channel target channel index
+     * @param {number} threshold voter critical
+     * @param {number} lineLength minimum line length
+     * @param {number} lineGap how long is the line allowed to be disconnected
+     * @param {number} rho r accuracy
+     * @param {number} theta θ accuracy
+     * @returns [[line1_start_point[x,y], line1_end_point], [line2...],...]
+     */
     HoughP(channel = 0, threshold = 95, lineLength = 95, lineGap = 2, rho = 1, theta = 1) {
         rho = 1 / rho;
         let thetaL = parseInt(180 / theta);             // 横轴长度
@@ -388,13 +486,13 @@ class jsPic {
                 if ((aLine[w] = channel[h][w]) == 255) edges.push([w, h]);//就是单等号
             flag[h] = aLine;
         }
-
+        console.log(edges.length)
         for (let count = edges.length; count > 0;) {
             // Step1. 随机选点
             let i = Math.floor(Math.random() * count);
             let p = edges[i];               // [w,h]
-            edges[i] = edges[--count];      // 删除这个点: 覆盖
-            if (!flag[p[1]][p[0]]) continue;// 被处理过(已经属于其他直线)
+            edges[i] = edges[--count];      // 删除这个点: 覆盖 
+            if (!flag[p[1]][p[0]]) continue;// 被处理过(已经属于其他直线)\
             // Step2. 投票
             let max_vote = threshold - 1;
             let max_x = 0;

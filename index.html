@@ -6,7 +6,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="./jsPic.js"></script>
-    <title>Score</title>
+    <title>image tool demo</title>
 </head>
 <style>
     body {
@@ -134,6 +134,17 @@
                 angle accuracy: <input type="text" name="PPHT" placeholder="int or decimal" value="1"><br>
                 <button onclick="houghp()">Progressive Probabilistic Hough Transform</button>
             </div>
+            <div class="card">
+                <b>convolution</b><br>
+                <textarea id="kernel" cols="20" rows="8">[&#10 [-1, 0, 1],&#10 [-2, 0, 2],&#10 [-1, 0, 1]&#10]</textarea>
+                <button onclick="Convolute()">convolution</button>
+            </div>
+            <div class="card">
+                <b>resize</b><br>
+                newWidth: <input type="text" name="size" value="500"><br>
+                newHeight: <input type="text" name="size" value="500"><br>
+                <button onclick="resize()">convolution</button>
+            </div>
             time used is printed in console.
             <br>
         </div>
@@ -254,6 +265,7 @@
         }
         ctx.strokeStyle = '#00ff00';
         ctx.stroke();
+        console.log(`find ${k.length} lines`)
         console.timeEnd('hough');
     }
     function houghp() {
@@ -271,7 +283,36 @@
             ctx.strokeStyle = colors[Math.floor(Math.random() * 3)];
             ctx.stroke();
         }
+        console.log(`find ${ps.length} lines`)
         console.timeEnd('houghp');
+    }
+    function Convolute(){
+        var inputs = document.getElementById('kernel').value;
+        inputs = JSON.parse(inputs);
+        console.time('convolution');
+        var d = new jsPic().fromImageData(imgData);
+        let setting = {
+            kernel: inputs,
+            padding: [Math.floor(inputs[0].length/2), Math.floor(inputs.length/2)],
+            select: [0, 1, 2]
+        }
+        d = d.convolution(setting);
+        imgData = d.toImageData([0, 1, 2, 3]);
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd('convolution')
+    }
+    function resize(){
+        var inputs = document.getElementsByName('size');
+        console.time('resize');
+        var d = new jsPic().fromImageData(imgData);
+        let w = parseInt(inputs[0].value);
+        let h = parseInt(inputs[1].value);
+        imgData = d.resize(w,h).toImageData([0, 1, 2, 3]);
+        c.width = w;
+        c.height = h;
+        ctx.putImageData(imgData, 0, 0);
+        document.getElementById('size').innerHTML = `width: ${w}, height: ${h}`;
+        console.timeEnd('resize')
     }
 </script>
 
