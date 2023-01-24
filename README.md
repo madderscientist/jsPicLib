@@ -1,5 +1,6 @@
 # jsPicLib
 a small picture processor on html
+maybe I won't update this repositories... I found [opencv.js](https://docs.opencv.org/4.7.0/d0/d84/tutorial_js_usage.html)... Maybe this project helps me learn more about the basic algorithms of image processing.
 ## demo
 [demo](https://madderscientist.github.io/jsPicLib/)
 
@@ -37,6 +38,8 @@ class jsPic: no constructor
 - convert_1
 - convolution
 - brighten
+- resize
+- TemplateMatch
 - Hough(Standard Hough Transform)
 - HoughP(Progressive Probabilistic Hough Transform)
 
