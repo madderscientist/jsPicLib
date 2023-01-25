@@ -231,7 +231,7 @@ class jsPic {
     /**
      * convoluion on selected channels
      * @param {Object} setting {kernel:Array(n*n), stride:Array(2), padding:Array(2), fill:Array(channel.length), pixfun:Function, select:Array}
-     * @description if fill[i] < 0, the nearliest pixel value will be used
+     * @description if fill[i] < 0, the nearliest pixel value will be used. this.channel[select[i]] will be filled with fill[i]. select only picks channels to convolute, and its order doesn't matter
      * @returns new jsPic
      */
     convolution({ kernel, stride = [1, 1], padding = [0, 0], fill = [127, 127, 127, 0], pixfun = x => { return x; }, select = [0, 1, 2] }) {
@@ -258,10 +258,9 @@ class jsPic {
                                 let hjudge = kh < 0 || kh >= this.height
                                 if (wjudge || hjudge) {
                                     if (value < 0) {    // 找最近的图片点
-                                        let vw = kw, vh = kh;
-                                        if (wjudge) vw = Math.min(Math.max(0, kw), this.width - 1);
-                                        if (hjudge) vh = Math.min(Math.max(0, kh), this.height - 1);
-                                        value = this.channel[c][vh][vw];
+                                        if (wjudge) kw = Math.min(Math.max(0, kw), this.width - 1);
+                                        if (hjudge) kh = Math.min(Math.max(0, kh), this.height - 1);
+                                        value = this.channel[c][kh][kw];
                                     }
                                 } else value = this.channel[c][kh][kw];
                                 sum += value * kernel[hh][ww];
@@ -269,9 +268,129 @@ class jsPic {
                         } L[W] = pixfun(sum);
                     } cha[H] = L;
                 } C[c] = cha;
-            } else C[c] = this.cloneChannel(c);
+            } else {
+                if (newHeight == this.height && newWidth == this.width) C[c] = this.cloneChannel(c);
+                else {
+                    console.warn('channel size not match!');
+                    let Channel = new Array(newHeight);
+                    for (let hh = 0, minh = Math.min(newHeight, this.height); hh < minh; hh++) {
+                        let x = new Uint8ClampedArray(newWidth).fill(255);
+                        for (let ww = 0, minw = Math.min(newWidth, this.width); ww < minw; ww++) {
+                            x[ww] = this.channel[c][hh][ww];
+                        } Channel[h] = x;
+                    } C[c] = Channel;
+                }
+            }
         }
         return new jsPic().new(newWidth, newHeight, C);
+    }
+
+    /**
+     * a more opening convolution. All the operators is defind in pixfun, whose parameter is the 1D-Array of values masked by kernel
+     * @param {Object} settings {kernel:[width,height], stride:Array(2), padding:Array(2), fill:Array(channel.length), pixfun:Function, select:Array} 
+     * @returns 
+     */
+    filter2D({ kernelSize = [3, 3], stride = [1, 1], padding = [0, 0], fill = [127, 127, 127, 0], pixfun = Ker => Math.max(...Ker), select = [0, 1, 2] }) {
+        let [kernelW, kernelH] = kernelSize;
+        let newHeight = Math.floor((this.height + 2 * padding[1] - kernelH) / stride[1] + 1);
+        let newWidth = Math.floor((this.width + 2 * padding[0] - kernelW) / stride[0] + 1);
+        let C = new Array(this.channel.length);
+        for (let c = 0; c < this.channel.length; c++) {
+            let i = select.indexOf(c);
+            if (i != -1) {
+                let cha = new Array(newHeight);
+                for (let h = -padding[1], H = 0; h < this.height + padding[1] - kernelH + 1; h += stride[1], H++) {
+                    let L = new Uint8ClampedArray(newWidth);
+                    for (let w = -padding[0], W = 0; w < this.width + padding[0] - kernelW + 1; w += stride[0], W++) {
+                        // 遍历卷积核
+                        let Ker = Array(kernelW * kernelH);
+                        let ki = 0;
+                        for (let hh = 0; hh < kernelH; hh++) {
+                            for (let ww = 0; ww < kernelW; ww++, ki++) {
+                                let kh = h + hh;
+                                let kw = w + ww;
+                                let value = fill[i];
+                                let wjudge = kw < 0 || kw >= this.width;
+                                let hjudge = kh < 0 || kh >= this.height
+                                if (wjudge || hjudge) {
+                                    if (value < 0) {    // 找最近的图片点
+                                        if (wjudge) kw = Math.min(Math.max(0, kw), this.width - 1);
+                                        if (hjudge) kh = Math.min(Math.max(0, kh), this.height - 1);
+                                        value = this.channel[c][kh][kw];
+                                    }
+                                } else value = this.channel[c][kh][kw];
+                                Ker[ki] = value;
+                            }
+                        } L[W] = pixfun(Ker);
+                    } cha[H] = L;
+                } C[c] = cha;
+            } else {
+                if (newHeight == this.height && newWidth == this.width) C[c] = this.cloneChannel(c);
+                else {  // 若大小变化，多了填充255，少了剪裁，左上角对齐
+                    console.warn('channel size not match!');
+                    let Channel = new Array(newHeight);
+                    for (let hh = 0, minh = Math.min(newHeight, this.height); hh < minh; hh++) {
+                        let x = new Uint8ClampedArray(newWidth).fill(255);
+                        for (let ww = 0, minw = Math.min(newWidth, this.width); ww < minw; ww++) {
+                            x[ww] = this.channel[c][hh][ww];
+                        } Channel[h] = x;
+                    } C[c] = Channel;
+                }
+            }
+        }
+        return new jsPic().new(newWidth, newHeight, C);
+    }
+
+    /**
+     * similar to opencv, but the border uses neighbour, anchor is center
+     * @param {Array} shapeKernel 
+     * @returns a new jspic
+     */
+    erode(shapeKernel = [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]]) {
+        let w = shapeKernel[0].length;
+        let h = shapeKernel.length;
+        let c = this.channel.length;
+        shapeKernel = shapeKernel.flat();
+        return this.filter2D({
+            kernelSize: [w, h],
+            padding: [Math.floor(w / 2), Math.floor(h / 2)],
+            fill: Array(c).fill(-1),
+            select: Array.from({ length: c }, (_, x) => x),
+            pixfun: function (ker) {
+                let min = 255;
+                for (let i = 0; i < w * h; i++) {
+                    if (shapeKernel[i])
+                        if (ker[i] < min) min = ker[i];
+                }
+                return min;
+            }
+        });
+    }
+
+    /**
+     * similar to opencv, but the border uses neighbour, anchor is center
+     * @param {Array} shapeKernel 
+     * @returns a new jspic
+     */
+    dilate(shapeKernel = [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]]) {
+        let w = shapeKernel[0].length;
+        let h = shapeKernel.length;
+        let c = this.channel.length;
+        shapeKernel = shapeKernel.flat();
+        return this.filter2D({
+            kernelSize: [w, h],
+            padding: [Math.floor(w / 2), Math.floor(h / 2)],
+            fill: Array(c).fill(-1),
+            select: Array.from({ length: c }, (_, x) => x),
+            pixfun: function (ker) {
+                let max = 0;
+                for (let i = 0; i < w * h; i++) {
+                    if (shapeKernel[i])
+                        if (ker[i] > max) max = ker[i];
+                }
+                return max;
+            }
+        });
     }
 
     /**
@@ -308,6 +427,59 @@ class jsPic {
     }
 
     /**
+     * fill all the holes satisfying the judge
+     * @param {number} channel target channel index
+     * @param {*} judge given the area points array and perimeter points array, return ture means fill the area
+     * @returns this
+     */
+    fillHole(channel = 0, judge = (area, perimeter) => true) {
+        let copy = this.cloneChannel(channel);
+        channel = this.channel[channel];
+        let dx = [0, 0, 1, -1];
+        let dy = [1, -1, 0, 0];
+        let area, perimeter;
+        let height = this.height, width = this.width;
+        // 基于栈查找封闭区域
+        function seek(seed = [0, 0]) {
+            copy[seed[1]][seed[0]]=1;
+            let stack = [seed];
+            area = [];
+            perimeter = [];
+            let edge = true;
+            while (stack.length) {
+                let at = stack.pop();
+                area.push(at);
+                copy[at[1]][at[0]]=1;
+                for (let i = 0; i < 4; i++) {
+                    let nx = at[0] + dx[i];
+                    let ny = at[1] + dy[i];
+                    if (0 <= ny && ny < height && 0 <= nx && nx < width) {
+                        if (copy[ny][nx] != 1) {
+                            if (copy[ny][nx] == 255) perimeter.push([nx, ny]);
+                            else {                      // 如果为0就入栈
+                                stack.push([nx, ny]);
+                                copy[ny][nx] = 1;       // 用1标记已访问
+                            }
+                        }
+                    } else edge = false;    // 没有边界
+                }
+            } return edge;
+        }
+        for (let h = 0; h < this.height; h++) {
+            for (let w = 0; w < this.width; w++) {
+                if (copy[h][w] == 0) {
+                    if (seek([w, h])) {
+                        if (judge(area, perimeter)) {
+                            for (let i = 0; i < area.length; i++) channel[area[i][1]][area[i][0]] = 255;
+                        }
+                    }
+                }
+            }
+        }
+        return this;
+    }
+
+    /**
      * resize via bilinear interpolation
      * @param {number} w 
      * @param {number} h 
@@ -336,7 +508,6 @@ class jsPic {
             ymap[i] = inty;
         }
         let output = new jsPic().new(w, h, this.channel.length);
-        console.log(output)
         for (let c = 0; c < this.channel.length; c++) {
             let ch = this.channel[c];
             for (ph = 0; ph < h; ph++) {
@@ -378,6 +549,8 @@ class jsPic {
         }
         return error;
     }
+
+
 
     /**
      * Hough Transform

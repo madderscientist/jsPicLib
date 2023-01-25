@@ -1,6 +1,8 @@
 # jsPicLib
 a small picture processor on html<br>
-Maybe I won't update this repository... I found [opencv.js](https://docs.opencv.org/4.7.0/d0/d84/tutorial_js_usage.html)... Maybe this project helps me learn more about the basic algorithms of image processing.
+Maybe I won't update this repository... I found [opencv.js](https://docs.opencv.org/4.7.0/d0/d84/tutorial_js_usage.html)... Maybe this project helps me learn more about the basic algorithms of image processing.<br>
+But It's easiler to use than opencv, especially operationg pixels. Opencv is a little bit overstaffed, isn't it? So I'll only write some functions I'll use. As to complex function, I'll use opencv.
+
 ## demo
 [demo](https://madderscientist.github.io/jsPicLib/)
 
@@ -10,6 +12,7 @@ This class imitates PIL, rearranging the data in a more clear way. It cuts chann
 Below is the data struct of the class:<br>
 I tend to use 2D-Array to avoid 1D->2D index convert (slower but more friendly, especially in convolution algorithm). Here are two options: each pixel is an Array of all channels, or separate channels to different 2D-Arrays. I made the decision considering memory:<br>
 From the website: [jsArray Memory use condition](https://www.mattzeunert.com/2016/07/24/javascript-array-object-sizes.html) we know that Arrays in Array takes more memory than numbers in Array. So we can draw a simple conclusion: less Array, less memory. As width and height are usually far bigger than channel number, of course the latter struct uses less Arrays.<br>
+
 ## DataStruct
 ```
 jsPic.channel =
@@ -37,13 +40,17 @@ class jsPic: no constructor
 - convert
 - convert_1
 - convolution
+- filter2D
 - brighten
 - resize
+- endore
+- dilate
+- fillHole
 - TemplateMatch
 - Hough(Standard Hough Transform)
 - HoughP(Progressive Probabilistic Hough Transform)
 
-also provided api based on ImageData:
+also provides api based on ImageData:
 - convert
 - convolution
 - gammaBright
@@ -53,5 +60,5 @@ common funtction:
 - rgbToHsb
 - hsbToRgb
 
-For more information please read jsPic.js<br>
+For more information please read jsPic.js. The code comments are clearly written. Use demonstration is shown in html.<br>
 Other functions like draw, zoom, paste, save... can be done with canvas api easily. The class is useful when do works like edge extraction. It's a By-product of my future project.

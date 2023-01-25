@@ -116,6 +116,12 @@
                 <button onclick="horizontalLine2()">ImageData horizontal line</button>
                 <br>using jsPic is much quicker
             </div>
+            <div class="card">
+                <b>morphology</b><br>
+                <button onclick="Erosion()">Erosion</button>
+                <button onclick="Dilation()">Dilation</button>
+                <button onclick="fillHole()">fillHole</button>
+            </div>
             <div class="SHough card">
                 <b>Standard Hough Transform (Line Detect):</b><br>
                 <font color="#FF0000">please edge extraction first!</font><br>
@@ -143,7 +149,7 @@
                 <b>resize</b><br>
                 newWidth: <input type="text" name="size" value="500"><br>
                 newHeight: <input type="text" name="size" value="500"><br>
-                <button onclick="resize()">convolution</button>
+                <button onclick="resize()">resize</button>
             </div>
             time used is printed in console.
             <br>
@@ -166,7 +172,7 @@
     }
     function to01() {
         console.time('Binarization');
-        convert(imgData, '1')
+        convert(imgData, '1',127)
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('Binarization');
     }
@@ -237,6 +243,34 @@
         convert(imgData, '1', 2)
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('horizontal Line2')
+    }
+    function Erosion(){
+        console.time('Erosion')
+        var d = new jsPic().fromImageData(imgData,'L');
+        imgData = d.erode([
+            [0,0,1,0,0],
+            [0,1,1,1,0],
+            [1,1,0,1,1],
+            [0,1,1,1,0],
+            [0,0,1,0,0]
+        ]).toImageData([0, 0, 0, -1]);
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd('Erosion')
+    }
+    function Dilation(){
+        console.time('Dilation')
+        var d = new jsPic().fromImageData(imgData,'L');
+        imgData = d.dilate().toImageData([0, 0, 0, -1]);
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd('Dilation')
+    }
+    function fillHole(){
+        console.time('fillHole')
+        var d = new jsPic().fromImageData(imgData,'1',127);
+        d.fillHole()
+        imgData = d.toImageData([0, 0, 0, -1]);
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd('fillHole')
     }
     function GammaB(){
         console.time('brighten(HSV)');
