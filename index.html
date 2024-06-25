@@ -73,7 +73,7 @@
             c.width = this.width;
             c.height = this.height;
             ctx.drawImage(img, 0, 0, this.width, this.height);
-            imgData = ctx.getImageData(0, 0, this.width, this.height);
+            imgData = ctx.getImageData(0, 0, this.width, this.height, {willReadFrequently: true});
             document.getElementById('size').innerHTML = `width: ${this.width}, height: ${this.height}`;
         }
         img.src = SRC;
@@ -96,9 +96,16 @@
             <input type="file" accept="image/*" onchange="receivePic(this.files[0]);this.value = '';"><br>
             <button onclick="origin()">show origin</button>
             <button onclick="toGrey()">to Grey</button>
-            <button onclick="to01()">Binarization</button>
             <button onclick="inverseGrey()">inverse Grey</button>
             <button onclick="Gblur()">Gaussian blur</button>
+            <div class="card">
+                <b>Binarization:</b><br>
+                threshold:<input type="text" name="Binarization" placeholder="-1->otsu" value="127"><button onclick="to01()">Binarization</button><br>
+                <button onclick="otsuThreshold()">otsuThreshold</button><br>
+                areaWidth:<input type="text" name="Binarization" placeholder="odd" value="3">
+                C:<input type="text" name="Binarization" placeholder="-1->otsu" value="1">
+                <button onclick="autoThreshold()">autoThreshold</button>
+            </div>
             <div class="card">
                 <b>Brighten:</b><br>
                 extent:<input type="text" name="Brighten" placeholder="1->still" value="2"><button onclick="GammaB()">Brighten(Gamma)</button><br>
@@ -148,7 +155,7 @@
             <div class="card">
                 <b>resize</b><br>
                 newWidth: <input type="text" name="size" value="500"><br>
-                newHeight: <input type="text" name="size" value="500"><br>
+                newHeight: <input type="text" name="size" value="-1"><br>
                 <button onclick="resize()">resize</button>
             </div>
             time used is printed in console.
@@ -171,8 +178,9 @@
         console.timeEnd('to Grey');
     }
     function to01() {
+        let threshold = parseInt(document.getElementsByName("Binarization")[0].value);
         console.time('Binarization');
-        convert(imgData, '1',127)
+        convert(imgData, '1',threshold)
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('Binarization');
     }
@@ -211,6 +219,7 @@
         var d = new jsPic().fromImageData(imgData);
         let setting = {
             kernel: jsPic.Gaussian,
+            // kernel: jsPic.GaussianKernel(3),
             padding: [1, 1]
         }
         d = d.convolution(setting);
@@ -257,10 +266,25 @@
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('Erosion')
     }
+    function www(){
+        console.time('Erosion')
+        var d = new jsPic().fromImageData(imgData,'L');
+        imgData = d.filter2D({
+            kernelSize: [1,5],
+            padding: [0,2],
+            select: [0],
+            pixfun: (ker)=>{
+                if(ker[2]<10) return 0;
+                return Math.min(...ker);
+            }
+        }).toImageData([0, 0, 0, -1]);
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd('Erosion')
+    }
     function Dilation(){
         console.time('Dilation')
         var d = new jsPic().fromImageData(imgData,'L');
-        imgData = d.dilate().toImageData([0, 0, 0, -1]);
+        imgData = d.dilate([[1,1,1],[1,1,1],[1,1,1]]).toImageData([0, 0, 0, -1]);
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('Dilation')
     }
@@ -341,12 +365,51 @@
         var d = new jsPic().fromImageData(imgData);
         let w = parseInt(inputs[0].value);
         let h = parseInt(inputs[1].value);
-        imgData = d.resize(w,h).toImageData([0, 1, 2, 3]);
+        d = d.resize(w,h);
+        w = d.width;
+        h = d.height;
+        imgData = d.toImageData([0, 1, 2, 3]);
         c.width = w;
         c.height = h;
         ctx.putImageData(imgData, 0, 0);
         document.getElementById('size').innerHTML = `width: ${w}, height: ${h}`;
         console.timeEnd('resize')
+    }
+
+    function tank(a,b){ // a:black background; b:white background
+        // a.brighten('hsb',1.3,[0]);
+        // b.brighten('hsb',0.4,[0]);
+        a.channel[1] = a.newChannel();
+        a.paste(0,0,b.copy(0,0,a.width,a.height),(b,l)=>{
+            let alpha = b[0]-l[0]+255;
+            let p = Math.floor(255*b[0]/alpha);
+            return [p, alpha];
+        });
+        imgData = a.toImageData([0,0,0,1]);
+        ctx.putImageData(imgData, 0, 0);
+    }
+    function otsuThreshold() {
+        console.time("jsPic: otsuThreshold");
+        let pic = new jsPic().fromImageData(imgData, 'L');
+        pic.convert_1(0, -1);
+        imgData = pic.toImageData([0, 0, 0, -1]);
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd("jsPic: otsuThreshold");
+    }
+    // 自适应二值化
+    function autoThreshold(size, c) {
+        size = size | parseInt(document.getElementsByName("Binarization")[1].value);
+        c = c | parseInt(document.getElementsByName("Binarization")[2].value);
+        console.time("jsPic: adaptiveThreshold");
+        var d = new jsPic().fromImageData(imgData, 'L');
+
+        let kernel = jsPic.GaussianKernel(size);
+        d = d.adaptiveThreshold(0, kernel, c);
+        // d = d.adaptiveThreshold(0, size, c);
+
+        imgData = d.toImageData([0, 0, 0, -1]);
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd("jsPic: adaptiveThreshold");
     }
 </script>
 

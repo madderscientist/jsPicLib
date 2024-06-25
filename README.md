@@ -39,14 +39,21 @@ class jsPic: no constructor
 - toImageData
 - convert
 - convert_1
-- convolution
+- histogram
+- otsu
 - filter2D
+- convolution
 - brighten
+- equalizeHist
 - resize
 - endore
 - dilate
 - fillHole
+- connectedComponents
+- adaptiveThreshold
 - TemplateMatch
+- copy
+- paste
 - Hough(Standard Hough Transform)
 - HoughP(Progressive Probabilistic Hough Transform)
 

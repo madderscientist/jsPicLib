@@ -2,6 +2,7 @@
  * @description a picture tool
  * @author madderscientist.github
  * @DataStruct
+ *  jsPic has three attributes:
  *  channel [
  *      channel_1 [
  *          Uint8ClampedArray_1 [value_1, value_2, ...],
@@ -11,32 +12,60 @@
  *      channel_2 [...],
  *      ...
  *  ]
+ *  height
+ *  width
  * @example
  *  let j = new jsPic().fromImageData(imagedata,'L')
  *  j = j.convolution({kernel:jsPic.Laplacian, picfun:(x=>Math.abs(x)>200?255:0), padding:[1,1]})
  */
 class jsPic {
     // useful kernels
-    static Gaussian = [[0.0625, 0.125, 0.0625], [0.125, 0.25, 0.125], [0.0625, 0.125, 0.0625]]
-    static Prewitt_H = [[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]]
-    static Prewitt_V = [[-1, -1, -1], [0, 0, 0], [1, 1, 1]]
-    static Sobel_H = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]
-    static Sobel_V = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]]
-    static Laplacian = [[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]]
+    static Gaussian = [[0.0625, 0.125, 0.0625], [0.125, 0.25, 0.125], [0.0625, 0.125, 0.0625]];
+    static Prewitt_H = [[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]];
+    static Prewitt_V = [[-1, -1, -1], [0, 0, 0], [1, 1, 1]];
+    static Sobel_H = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
+    static Sobel_V = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
+    static Laplacian = [[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]];
+    /**
+     * normalized Gaussian kernel
+     * @param {number} n 尺寸
+     * @returns {Array<Array>} 2D square array
+     */
+    static GaussianKernel(n) {
+        let kernel = new Array(n);
+        let sum = 0;
+        let c = n >> 1;
+        for (let i = 0; i < n; i++) {
+            kernel[i] = new Array(n);
+            for (let j = 0; j < n; j++) {
+                kernel[i][j] = Math.exp(-((i - c) ** 2 + (j - c) ** 2) / 2);
+                sum += kernel[i][j];
+            }
+        }
+        for (let i = 0; i < n; i++)
+            for (let j = 0; j < n; j++)
+                kernel[i][j] /= sum;
+        return kernel;
+    }
 
     /**
      * new a jsPic from param
-     * @param {number} width the picture's width
-     * @param {number} height the picture's height
      * @param {number | Array} channel if number, initialize data filled with param 'fill'; if Array, use it directly
+     * @param {number} width the picture's width. If channel is Array, this value will be automatically set
+     * @param {number} height the picture's height
      * @param {Int8Array} fill fill[i] = channel{i}'s default value (only used when 'channel' is a number)
      * @returns {jsPic} overwirte and return itself
      */
-    new(width, height, channel = 4, fill = [255, 255, 255, 255]) {
-        this.width = width;
-        this.height = height;
-        if (Array.isArray(channel)) this.channel = channel;
-        else this.channel = Array.from({ length: channel }, (_, i) => this.newChannel(fill[i]));
+    new(channel, width, height, fill = [255, 255, 255, 255]) {
+        if (Array.isArray(channel)) {
+            this.channel = channel;
+            this.width = channel[0][0].length;
+            this.height = channel[0].length;
+        } else {
+            this.width = width;
+            this.height = height;
+            this.channel = Array.from({ length: channel }, (_, i) => this.newChannel(fill[i]));
+        }
         return this;
     }
 
@@ -63,7 +92,7 @@ class jsPic {
      * deeply clone a jsPic
      * @returns {jsPic} copy
      */
-    clone() { return new jsPic().new(this.width, this.height, Array.from(this.channel, (_, index) => this.cloneChannel(index))); }
+    clone() { return new jsPic().new(Array.from(this.channel, (_, index) => this.cloneChannel(index))); }
 
     /**
      * get a pixel at (x,y)
@@ -79,14 +108,14 @@ class jsPic {
 
     /**
      * traverse this.channel[channel], replacing each value with mapfn(value)
-     * @param {number} channel target channel index
+     * @param {number | Array} channel target channel index or channel object
      * @param {Function} mapfn input: each value; its output will be used
      */
-    throughChannel(channel, mapfn = x => x) {
-        let d = this.channel[channel];
+    throughChannel(channel, mapfn = (v, x, y) => v) {
+        if(typeof channel === 'number') channel = this.channel[channel];
         for (let h = 0; h < this.height; h++)
             for (let w = 0; w < this.width; w++)
-                d[h][w] = mapfn(d[h][w]);
+                channel[h][w] = mapfn(channel[h][w], w, h);
     }
 
     /**
@@ -107,7 +136,7 @@ class jsPic {
     /**
      * construct jsPic from ImageData
      * @param {ImageData} ImgData ImageData from html canvas
-     * @param {String} mode convert mode (convert here is quicker than convert afterwards)
+     * @param {String} mode convert mode:'RGB'|'RGBA'|'L'|'1' (convert here is quicker than convert afterwards)
      * @param {number} threshold only used when mode = '1'
      * @returns {jsPic} overwrite and return itself
      */
@@ -178,8 +207,8 @@ class jsPic {
 
     /**
      * mode convert without changing itself
-     * @param {String} mode 
-     * @param {number} threshold only used when mode='1'
+     * @param {String} mode 'L' | '1' | 'RGB'
+     * @param {number} threshold only used when mode='1'; for otsu method please use .convert_1 after converting to 'L'
      * @returns {jsPic} new jsPic
      */
     convert(mode = 'L', threshold = 127) {
@@ -194,7 +223,7 @@ class jsPic {
                     }
                     C[h] = L;
                 }
-                return new jsPic().new(this.width, this.height, [C]);
+                return new jsPic().new([C]);
             case '1':       // black & white
                 if (this.channel.length >= 3) {
                     let L = this.convert('L');
@@ -209,12 +238,12 @@ class jsPic {
                         }
                         C[h] = L;
                     }
-                    return new jsPic().new(this.width, this.height, [C]);
+                    return new jsPic().new([C]);
                 } else break;
             case 'RGB':
                 if (this.channel.length == 3) return this.clone();
                 else if (this.channel.length == 4)
-                    return new jsPic().new(this.width, this.height, Array.from({ length: this.channel.length - 1 }, (_, index) => this.cloneChannel(index)));
+                    return new jsPic().new(Array.from({ length: this.channel.length - 1 }, (_, index) => this.cloneChannel(index)));
                 else break;
             default: console.error("unknown mode!"); return null;
         }
@@ -224,74 +253,74 @@ class jsPic {
     /**
      * Binarization one channel (change itself)
      * @param {number} channel target channel index
-     * @param {*} threshold 
+     * @param {number} threshold if -1, use otsu method
      */
-    convert_1(channel, threshold = 127) { this.throughChannel(channel, (x) => { return x > threshold ? 255 : 0; }); }
-
-    /**
-     * convoluion on selected channels
-     * @param {Object} setting {kernel:Array(n*n), stride:Array(2), padding:Array(2), fill:Array(channel.length), pixfun:Function, select:Array}
-     * @description if fill[i] < 0, the nearliest pixel value will be used. this.channel[select[i]] will be filled with fill[i]. select only picks channels to convolute, and its order doesn't matter
-     * @returns new jsPic
-     */
-    convolution({ kernel, stride = [1, 1], padding = [0, 0], fill = [127, 127, 127, 0], pixfun = x => { return x; }, select = [0, 1, 2] }) {
-        let kernelW = kernel[0].length;
-        let kernelH = kernel.length;
-        let newHeight = Math.floor((this.height + 2 * padding[1] - kernelH) / stride[1] + 1);
-        let newWidth = Math.floor((this.width + 2 * padding[0] - kernelW) / stride[0] + 1);
-        let C = new Array(this.channel.length);
-        for (let c = 0; c < this.channel.length; c++) {     // 如果select比channel多, 用前几个数字
-            let i = select.indexOf(c);
-            if (i != -1) {
-                let cha = new Array(newHeight);
-                for (let h = -padding[1], H = 0; h < this.height + padding[1] - kernelH + 1; h += stride[1], H++) {
-                    let L = new Uint8ClampedArray(newWidth);
-                    for (let w = -padding[0], W = 0; w < this.width + padding[0] - kernelW + 1; w += stride[0], W++) {
-                        // 遍历卷积核
-                        let sum = 0;
-                        for (let hh = 0; hh < kernelH; hh++) {
-                            for (let ww = 0; ww < kernelW; ww++) {
-                                let kh = h + hh;
-                                let kw = w + ww;
-                                let value = fill[i];
-                                let wjudge = kw < 0 || kw >= this.width;
-                                let hjudge = kh < 0 || kh >= this.height
-                                if (wjudge || hjudge) {
-                                    if (value < 0) {    // 找最近的图片点
-                                        if (wjudge) kw = Math.min(Math.max(0, kw), this.width - 1);
-                                        if (hjudge) kh = Math.min(Math.max(0, kh), this.height - 1);
-                                        value = this.channel[c][kh][kw];
-                                    }
-                                } else value = this.channel[c][kh][kw];
-                                sum += value * kernel[hh][ww];
-                            }
-                        } L[W] = pixfun(sum);
-                    } cha[H] = L;
-                } C[c] = cha;
-            } else {
-                if (newHeight == this.height && newWidth == this.width) C[c] = this.cloneChannel(c);
-                else {
-                    console.warn('channel size not match!');
-                    let Channel = new Array(newHeight);
-                    for (let hh = 0, minh = Math.min(newHeight, this.height); hh < minh; hh++) {
-                        let x = new Uint8ClampedArray(newWidth).fill(255);
-                        for (let ww = 0, minw = Math.min(newWidth, this.width); ww < minw; ww++) {
-                            x[ww] = this.channel[c][hh][ww];
-                        } Channel[h] = x;
-                    } C[c] = Channel;
-                }
-            }
-        }
-        return new jsPic().new(newWidth, newHeight, C);
+    convert_1(channel, threshold = 127) {
+        if(threshold<0) threshold = this.otsu(channel);
+        console.log(threshold);
+        this.throughChannel(channel, (x) => { return x > threshold ? 255 : 0; });
     }
 
     /**
-     * a more opening convolution. All the operators is defind in pixfun, whose parameter is the 1D-Array of values masked by kernel
-     * @param {Object} settings {kernel:[width,height], stride:Array(2), padding:Array(2), fill:Array(channel.length), pixfun:Function, select:Array} 
-     * @returns 
+     * statistic of the channel
+     * @param {number} channel which channel to statistic
+     * @returns {Uint32Array} histogram of the channel
      */
-    filter2D({ kernelSize = [3, 3], stride = [1, 1], padding = [0, 0], fill = [127, 127, 127, 0], pixfun = Ker => Math.max(...Ker), select = [0, 1, 2] }) {
+    histogram(channel = 0) {
+        let hist = new Uint32Array(256);    // 用Uint16会溢出
+        let c = this.channel[channel];
+        for (let h = 0; h < this.height; h++) {
+            let cc = c[h];
+            for (let w = 0; w < this.width; w++)
+                hist[cc[w]]++;
+        } return hist;
+    }
+
+    /**
+     * ostu method to get the binary threshold of a channel
+     * @param {number} channel channel to get the threshold
+     * @returns {number} threshold
+     */
+    otsu(channel = 0) {
+        let hist = this.histogram(channel);
+        let PointNum = this.width * this.height; // 求和
+        let All = 0;
+        for (let i = 0; i < 256; i++) All += i * hist[i];
+        let bSum = 0;
+        let bNum = 0;
+        let wNum = 0;
+        let varMax = 0;
+        let threshold = 0;
+        for (let i = 0; i < 256; i++) {
+            bNum += hist[i];  // 左侧的像素数目
+            if (bNum == 0) continue;
+            wNum = PointNum - bNum;  // 右侧的像素数目
+            if (wNum == 0) break;
+            bSum += i * hist[i];    // 左侧的灰度总和
+            let mean_dis = bSum / bNum - (All - bSum) / wNum;
+            let varBetween = bNum * wNum * mean_dis * mean_dis;
+            if (varBetween > varMax) {
+                varMax = varBetween;
+                threshold = i;
+            }
+        } return threshold;
+    }
+
+    /**
+     * an opening convolution focusing on each channel. All the operators is defind in pixfun, whose parameter is the 1D-Array of values masked by kernel
+     * @param {Object} settings
+     * @param {[number, number]} settings.kernel - kernel size: [width, height]. Odd number is suggested.
+     * @param {[number, number]} settings.stride - [Xstride, Ystride]. Default is [1, 1]
+     * @param {[number, number]} settings.padding - padding size: [paddingWidth, paddingHeight]. If -1, padding = kernelSize >> 1
+     * @param {[number, number]} settings.fill - if fill[i] < 0, the nearliest pixel value will be used; else this.channel[select[i]] will be filled with fill[i].
+     * @param {Function} settings.pixfun - how to process the kernel. Input is the 1D-Array of values masked by kernel, and its anchor coordinate, output is the pixel value.
+     * @param {Array} settings.select - only picks channels to convolute, and its order doesn't matter. Unselected channels will be copied.
+     * @returns new jspic, which has the same channel count as the original one
+     */
+    filter2D({ kernelSize = [3, 3], stride = [1, 1], padding = [-1, -1], fill = [127, 127, 127, 0], pixfun = (Ker, x, y) => Math.max(...Ker), select = [0, 1, 2] }) {
         let [kernelW, kernelH] = kernelSize;
+        if(padding[0] < 0) padding[0] = kernelW >> 1;
+        if(padding[1] < 0) padding[1] = kernelH >> 1;
         let newHeight = Math.floor((this.height + 2 * padding[1] - kernelH) / stride[1] + 1);
         let newWidth = Math.floor((this.width + 2 * padding[0] - kernelW) / stride[0] + 1);
         let C = new Array(this.channel.length);
@@ -321,7 +350,7 @@ class jsPic {
                                 } else value = this.channel[c][kh][kw];
                                 Ker[ki] = value;
                             }
-                        } L[W] = pixfun(Ker);
+                        } L[W] = pixfun(Ker, w, h);
                     } cha[H] = L;
                 } C[c] = cha;
             } else {
@@ -338,12 +367,33 @@ class jsPic {
                 }
             }
         }
-        return new jsPic().new(newWidth, newHeight, C);
+        return new jsPic().new(C);
+    }
+
+    /**
+     * convoluion on selected channels
+     * @param {Object} setting refer to filter2D
+     * @param {Array} setting.kernel 2D array
+     * @returns new jsPic
+     */
+    convolution({ kernel, stride = [1, 1], padding = [-1, -1], fill = [127, 127, 127, 0], pixfun = x => { return x; }, select = [0, 1, 2] }) {
+        let kernelW = kernel[0].length;
+        let kernelH = kernel.length;
+        kernel = kernel.flat();
+        return this.filter2D({
+            kernelSize: [kernelW, kernelH], select: select,
+            stride: stride, padding: padding, fill: fill,
+            pixfun: Ker => {
+                let sum = 0;
+                for (let i = 0; i < kernel.length; i++) sum += kernel[i] * Ker[i];
+                return pixfun(sum);
+            }
+        });
     }
 
     /**
      * similar to opencv, but the border uses neighbour, anchor is center
-     * @param {Array} shapeKernel 
+     * @param {Array} shapeKernel mask of shape, 0 means ignore
      * @returns a new jspic
      */
     erode(shapeKernel = [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]]) {
@@ -427,7 +477,30 @@ class jsPic {
     }
 
     /**
-     * fill all the holes satisfying the judge
+     * histogram equalization
+     * @param {number} channel channel to apply
+     * @returns this
+     */
+    equalizeHist(channel = 0) {
+        let hist = new Array(256).fill(0);
+        let c = this.channel[channel];
+        // 求直方图
+        for (let h = 0; h < this.height; h++)
+            for (let w = 0; w < this.width; w++)
+                hist[c[h][w]]++;
+        let sum = hist.reduce((a, b) => a + b); // 求和
+        let map = new Array(256);
+        let sumHist = 0;
+        for (let i = 0; i < 256; i++) {
+            sumHist += hist[i];
+            map[i] = Math.round(255 * sumHist / sum);   // 概率密度对应到像素
+        }
+        this.throughChannel(channel, x => map[x]);
+        return this;
+    }
+
+    /**
+     * fill all the holes satisfying the judge (255 is regarded as edge)
      * @param {number} channel target channel index
      * @param {*} judge given the area points array and perimeter points array, return ture means fill the area
      * @returns this
@@ -481,11 +554,19 @@ class jsPic {
 
     /**
      * resize via bilinear interpolation
-     * @param {number} w 
-     * @param {number} h 
-     * @returns a new jspic
+     * @param {number} w if <=0, keeps the ratio
+     * @param {number} h if <=0, keeps the ratio
+     * @returns a new jspic (null if failed)
      */
-    resize(w, h) {
+    resize(w, h=-1) {
+        if(w <= 0) {
+            if(h > 0) w = this.width * h / this.height;
+            else return null;
+        }
+        if(h <= 0) h = this.height * w / this.width;
+        w = Math.round(w);
+        h = Math.round(h);
+        if(w <= 0 || h <= 0) return null;
         // 用双线性插值 映射法则: 放大的时候用点模型 缩小的时候用边模型
         let pw = w < this.width ? this.width / w : (this.width - 1.5) / (w - 1);
         let xmap = pw < 1 ? Array.from({ length: w }, (_, x) => x * pw) : Array.from({ length: w }, (_, x) => (x + 0.5) * pw - 0.5);
@@ -499,15 +580,15 @@ class jsPic {
         }
         let ph = h < this.height ? this.height / h : (this.height - 1.5) / (h - 1);
         let ymap = ph < 1 ? Array.from({ length: h }, (_, y) => y * ph) : Array.from({ length: h }, (_, y) => (y + 0.5) * ph - 0.5);
-        let yl = new Float32Array(w);
-        let yr = new Float32Array(w);
+        let yl = new Float32Array(h);
+        let yr = new Float32Array(h);
         for (let i = 0; i < h; i++) {
             let inty = Math.floor(ymap[i]);
             yl[i] = ymap[i] - inty;
             yr[i] = 1 - yl[i];
             ymap[i] = inty;
         }
-        let output = new jsPic().new(w, h, this.channel.length);
+        let output = new jsPic().new(this.channel.length, w, h);
         for (let c = 0; c < this.channel.length; c++) {
             let ch = this.channel[c];
             for (ph = 0; ph < h; ph++) {
@@ -550,7 +631,122 @@ class jsPic {
         return error;
     }
 
+    /**
+     * copy part of jspic
+     * @param {number} x left
+     * @param {number} y top
+     * @param {number} w area width
+     * @param {number} h area height
+     * @returns new jspic
+     */
+    copy(x,y,w,h){
+        let p = new jsPic().new(this.channel.length,w,h,[0,0,0,0]);
+        w = Math.min(x+w,this.width);
+        h = Math.min(y+h,this.height);
+        for(let yy=0;y<h;y++,yy++)
+            for(let j=x, xx=0; j<w; j++, xx++)
+                for(let c=0;c<this.channel.length;c++)
+                    p.channel[c][yy][xx] = this.channel[c][y][j];
+        return p;
+    }
 
+    /**
+     * mix jspic with another
+     * @param {number} x left
+     * @param {number} y top
+     * @param {jsPic} jspic to be pasted
+     * @param {function} picfun how to mix. Inputs are two pixels, return an Array
+     */
+    paste(x, y, jspic, picfun = (origin,cover)=>cover){
+        let h = Math.min(this.height, jspic.height + y);
+        let w = Math.min(this.width, jspic.width + x);
+        for(let yy=0; y<h; y++, yy++)
+            for(let j=x, xx=0; j<w; j++, xx++){
+                let pix = picfun(
+                    Array.from(this.channel,(_,i)=>this.channel[i][y][j]),
+                    Array.from(jspic.channel,(_,i)=>jspic.channel[i][yy][xx])
+                );
+                for(let c=0; c<this.channel.length; c++)
+                    this.channel[c][y][j] = typeof pix[c] === 'number'? pix[c] : 0;
+            }
+    }
+
+    /**
+     * find the connected components: 8 neighborhood judgment connectivity
+     * @param {number} channel channel to be processed
+     * @param {number} threshold bigger than which is called "connected"
+     * @returns [map, position]: map is the label map, position is the box of each component: [x,y,w,h,state(t or f)]
+     */
+    connectedComponents(channel = 0, threshold = 127) {
+        channel = this.channel[channel];
+        let map = new Array(this.height);   // 标记图
+        for (let h = 0; h < this.height; h++)
+            map[h] = new Uint16Array(this.width).fill(-1);
+        let maxValue = map[0][0];
+        let position = [];              // 位置表
+        let id = 0;
+        let seek = (x, y) => {
+            let state = channel[y][x] > threshold;
+            let locL = this.width, locR = 0, locT = this.height, locB = 0;  // 位置
+            let stackX = [x], stackY = [y]; // 不用queue是因为shift开销大，用两个stack是因为比一个快了5倍
+            while (stackX.length) {
+                let w = stackX.pop();
+                let h = stackY.pop();
+                if (w < 0 || w >= this.width || h < 0 || h >= this.height) continue;
+                if (map[h][w] != maxValue || state != (channel[h][w] > threshold)) continue;
+                if (w < locL) locL = w;
+                if (w > locR) locR = w;
+                if (h < locT) locT = h;
+                if (h > locB) locB = h;
+                map[h][w] = id;
+                stackX.push(w + 1, w - 1, w, w, w + 1, w - 1, w + 1, w - 1);
+                stackY.push(h, h, h + 1, h - 1, h + 1, h + 1, h - 1, h - 1);
+            }
+            position.push([locL, locT, locR - locL + 1, locB - locT + 1, state]);
+            id++;
+        }
+        for (let h = 0; h < this.height; h++)
+            for (let w = 0; w < this.width; w++)
+                if (map[h][w] == maxValue) seek(w, h);
+        return [map, position];
+    }
+
+    /**
+     * adaptiveThreshold
+     * @param {number} channel which channel to process
+     * @param {number | Array<Array>} KernelOrSize kernel or is width
+     * @param {number} c the same meaning as OpenCV
+     * @param {number} fill padding option like filter2D
+     * @returns new jsPic with one channel
+     */
+    adaptiveThreshold(channel, KernelOrSize=jsPic.Gaussian, c=2, fill=-1) {
+        let kernel = KernelOrSize;
+        if (typeof KernelOrSize === 'number') {
+            kernel = Array.from({ length: KernelOrSize }, () => Array(KernelOrSize).fill(1));
+        }
+        let kernelSum = 0;
+        for (let i = 0; i < kernel.length; i++)
+            for (let j = 0; j < kernel[i].length; j++)
+                kernelSum += kernel[i][j];
+        let kernelh = kernel.length;
+        kernel = kernel.flat();
+        channel = this.channel[channel];
+        let filtered = new jsPic().new([channel]);   // 引用
+        filtered = filtered.filter2D({
+            kernelSize: [kernelh, kernelh],
+            fill: [fill],
+            pixfun: Ker => {
+                let sum = 0;
+                for (let i = 0; i < Ker.length; i++) sum += kernel[i] * Ker[i];
+                return (sum / kernelSum);
+            }
+        });
+        let fc = filtered.channel[0];
+        for(let i = 0; i < this.height; i++)
+            for(let j = 0; j < this.width; j++)
+                fc[i][j] = channel[i][j] > fc[i][j] - c ? 255 : 0;
+        return filtered;
+    }
 
     /**
      * Hough Transform
