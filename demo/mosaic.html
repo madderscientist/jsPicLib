@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="../jsPic.js"></script>
+    <title>马赛克</title>
+</head>
+<script>
+    // html操作本地图片方法: 用FileReader读取, 用img加载, 用画布获得像素信息
+    var c = null;
+    var ctx = null;
+    var imgData = null;
+    var imgsrc = null;
+    var dd = null;
+    window.onload = function () {     // body上面的script比body先加载, 其中的getelement必须等页面加载完才能成功
+        c = document.getElementById('picShow')
+        ctx = c.getContext('2d')
+    }
+    function imgToCanvas(SRC) {
+        var img = new Image();      // 浅看了一下js垃圾回收 只create但不加入dom树, 随CG一起回收 appendChild之后挂到dom上就不会回收, 直到remove了
+        img.onload = function () {   // 注意这里不能用 ()=>{} function的this随环境变化而变化, 但箭头函数的this始终为父对象(这里是上级函数)
+            c.width = this.width;
+            c.height = this.height;
+            ctx.drawImage(img, 0, 0, this.width, this.height);
+            imgData = ctx.getImageData(0, 0, this.width, this.height);
+            document.getElementById('size').innerHTML = `width: ${this.width}, height: ${this.height}`;
+        }
+        img.src = SRC;
+        imgsrc = SRC;
+    }
+    function receivePic(file) {     // 把图片画到画布上，获取图片信息
+        dd = null;
+        var fin = new FileReader();
+        fin.onload = function () {
+            if (FileReader.DONE == fin.readyState) {
+                imgToCanvas(fin.result)
+            }
+        }
+        fin.readAsDataURL(file);
+    }
+</script>
+
+<body>
+    <input type="file" accept="image/*" onchange="receivePic(this.files[0]);this.value = '';">
+    <input type="range" id="masaik" onchange="changeMa(this.value)" max="50" min="2">
+    <div class="showPic">
+        <canvas id="picShow"></canvas>
+        <p id="size"></p>
+    </div>
+</body>
+<script>
+    function masaike(x = 10) {
+        if (dd == null) dd = new jsPic().fromImageData(imgData, 'RGB');
+        let d = dd.clone();
+        for (let i = 0; i < 3; i++) {
+            let c = d.channel[i];
+            for (let h = 0; h < d.height; h += x) {
+                let endh = Math.min(h + x, d.height);
+                for (let w = 0; w < d.width; w += x) {
+                    let endw = Math.min(w + x, d.width);
+                    let sum = 0
+                    for (let a = w; a < endw; a++) {
+                        for (let b = h; b < endh; b++) {
+                            sum += c[b][a];
+                        }
+                    }
+                    sum = sum / ((endw - w) * (endh - h));
+                    for (let a = w; a < endw; a++) {
+                        for (let b = h; b < endh; b++) {
+                            c[b][a] = sum;
+                        }
+                    }
+                }
+            }
+
+        }
+        imgData = d.toImageData([0, 1, 2, 3]);
+        ctx.putImageData(imgData, 0, 0);
+    }
+    function changeMa(x) {
+        masaike(parseInt(x))
+        console.log(x)
+    }
+</script>
+
+</html>

@@ -1,10 +1,12 @@
 # jsPicLib
 a small picture processor on html<br>
-Maybe I won't update this repository... I found [opencv.js](https://docs.opencv.org/4.7.0/d0/d84/tutorial_js_usage.html)... Maybe this project helps me learn more about the basic algorithms of image processing.<br>
-But It's easiler to use than opencv, especially operationg pixels. Opencv is a little bit overstaffed, isn't it? So I'll only write some functions I'll use. As to complex function, I'll use opencv.
+~~Maybe I won't update this repository... I found [opencv.js](https://docs.opencv.org/4.7.0/d0/d84/tutorial_js_usage.html)... Maybe this project helps me learn more about the basic algorithms of image processing.<br>
+But It's easiler to use than opencv, especially operationg pixels. Opencv is a little bit overstaffed, isn't it? So I'll only write some functions I'll use. As to complex function, I'll use opencv.~~<br>
+I prefer to use my lib because it's easy. I have used it in many projects and kept updating.
 
 ## demo
-[demo](https://madderscientist.github.io/jsPicLib/)
+- [basic functions](https://madderscientist.github.io/jsPicLib/)
+- [mosaic](https://madderscientist.github.io/jsPicLib/demo/mosaic.html)
 
 ## feature
 To process image on html, we use ImageData from html-canvas. However, ImageData saves all 4 channels, which sometimes is useless, especially when it's converted to grayscale image —— only one channel is needed, and three channels are same. But we still need to maintain the useless information in algorithm, which increases time and space complexity.<br>
@@ -56,6 +58,13 @@ class jsPic: no constructor
 - paste
 - Hough(Standard Hough Transform)
 - HoughP(Progressive Probabilistic Hough Transform)
+- bilinearMap
+
+if [jsPicMat.js](./jsPicMat.js) is imported (this lib require a Matrix Computing Library. [mat.js](./mat.js) should be imported before jsPicMat.js), the following APIs are added:
+- transform
+- commonCoordTrans
+- rotate
+- GetPerspectiveTransform
 
 also provides api based on ImageData:
 - convert
@@ -67,5 +76,5 @@ common funtction:
 - rgbToHsb
 - hsbToRgb
 
-For more information please read jsPic.js. The code comments are clearly written. Use demonstration is shown in html.<br>
+For more information please read [jsPic.js](./jsPic.js) and [jsPicMat.js](./jsPicMat.js). The code comments are clearly written. Use demonstration is shown in html.<br>
 Other functions like draw, zoom, paste, save... can be done with canvas api easily. The class is useful when do works like edge extraction. It's a By-product of my future project.

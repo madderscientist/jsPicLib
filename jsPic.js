@@ -915,6 +915,50 @@ class jsPic {
         }
         return output;
     }
+
+    /**
+     * bilinear interpolation. map is an array of size width*height
+     * @param {jsPic} source map source
+     * @param {Float32Array} xmap 
+     * @param {Float32Array} ymap 
+     * @param {Array} fill if fill[i]<0, the closest pixel will be used 
+     * @returns {jsPic} this
+     */
+    bilinearMap(source, xmap, ymap, fill = [-1, -1, -1, 0]) {
+        const size = this.width*this.height;
+        if(xmap.length!=size || ymap.length!=size) throw new Error("size not match");
+        for (let c = 0; c < this.channel.length; c++) {
+            const sch = source.channel[c];
+            for (let y = 0, point = 0; y < this.height; y++) {
+                const row = this.channel[c][y];
+                for (let x = 0; x < this.width; x++) {
+                    const X = xmap[point];
+                    const Y = ymap[point];
+                    point++;
+                    // 如果坐标在原图像内
+                    if (X >= -1 && X < source.width && Y >= -1 && Y < source.height) {
+                        // 双线性插值
+                        const x0 = Math.floor(X);   // 必须用floor，因为如果是-0.4，用 |0 得到的是0
+                        const x1 = Math.ceil(X);
+                        const y0 = Math.floor(Y);
+                        const y1 = Math.ceil(Y);
+                        const dx = X - x0; const bx = 1 - dx;
+                        const dy = Y - y0; const by = 1 - dy;
+                        // 如果越界则使用fill[c]
+                        let row_must = sch[y0] || sch[y1];
+                        let row_y0 = sch[y0] || [];
+                        let row_y1 = sch[y1] || [];
+                        const FILL = fill[c] < 0 ? ((row_must[x0] || row_must[x1]) | 0) : fill[c];
+                        const x0y0 = row_y0[x0] == void 0 ? FILL : row_y0[x0];
+                        const x1y0 = row_y0[x1] == void 0 ? FILL : row_y0[x1];
+                        const x0y1 = row_y1[x0] == void 0 ? FILL : row_y1[x0];
+                        const x1y1 = row_y1[x1] == void 0 ? FILL : row_y1[x1];
+                        row[x] = bx * by * x0y0 + dx * by * x1y0 + bx * dy * x0y1 + dx * dy * x1y1;
+                    }
+                }
+            }
+        } return this;
+    }
 }
 
 function hsbToRgb(hsb) {

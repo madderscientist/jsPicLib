@@ -6,27 +6,33 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="./jsPic.js"></script>
+    <script src="./mat.js"></script>
+    <script src="./jsPicMat.js"></script>
     <title>image tool demo</title>
 </head>
 <style>
+    html,
     body {
         background-color: lightcoral;
     }
 
     .parent {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        grid-template-rows: 1fr;
-        grid-column-gap: 0px;
-        grid-row-gap: 0px;
-    }
-
-    .btns {
-        grid-area: 1 / 1 / 2 / 2;
+        display: flex;
+        width: 100%;
     }
 
     .showPic {
-        grid-area: 1 / 2 / 2 / 3;
+        flex: 1;
+        position: relative;
+        display: flex;
+        justify-content: center;
+
+        div {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
     }
 
     input[type=text] {
@@ -63,9 +69,8 @@
     var imgData = null;
     var imgsrc = null;
     window.onload = function () {     // body上面的script比body先加载, 其中的getelement必须等页面加载完才能成功
-        c = document.getElementById('picShow')
-        ctx = c.getContext('2d')
-        imgToCanvas('./testPic.png')
+        c = document.getElementById('picShow');
+        ctx = c.getContext('2d');
     }
     function imgToCanvas(SRC) {
         var img = new Image();      // 浅看了一下js垃圾回收 只create但不加入dom树, 随CG一起回收 appendChild之后挂到dom上就不会回收, 直到remove了
@@ -73,7 +78,7 @@
             c.width = this.width;
             c.height = this.height;
             ctx.drawImage(img, 0, 0, this.width, this.height);
-            imgData = ctx.getImageData(0, 0, this.width, this.height, {willReadFrequently: true});
+            imgData = ctx.getImageData(0, 0, this.width, this.height, { willReadFrequently: true });
             document.getElementById('size').innerHTML = `width: ${this.width}, height: ${this.height}`;
         }
         img.src = SRC;
@@ -93,14 +98,16 @@
 <body>
     <div class="parent">
         <div class="btns">
-            <input type="file" accept="image/*" onchange="receivePic(this.files[0]);this.value = '';"><br>
+            <input type="file" accept="image/*" id="inputImgBtn"
+                onchange="receivePic(this.files[0]);this.value = '';"><br>
             <button onclick="origin()">show origin</button>
             <button onclick="toGrey()">to Grey</button>
             <button onclick="inverseGrey()">inverse Grey</button>
             <button onclick="Gblur()">Gaussian blur</button>
             <div class="card">
                 <b>Binarization:</b><br>
-                threshold:<input type="text" name="Binarization" placeholder="-1->otsu" value="127"><button onclick="to01()">Binarization</button><br>
+                threshold:<input type="text" name="Binarization" placeholder="-1->otsu" value="127"><button
+                    onclick="to01()">Binarization</button><br>
                 <button onclick="otsuThreshold()">otsuThreshold</button><br>
                 areaWidth:<input type="text" name="Binarization" placeholder="odd" value="3">
                 C:<input type="text" name="Binarization" placeholder="-1->otsu" value="1">
@@ -108,8 +115,10 @@
             </div>
             <div class="card">
                 <b>Brighten:</b><br>
-                extent:<input type="text" name="Brighten" placeholder="1->still" value="2"><button onclick="GammaB()">Brighten(Gamma)</button><br>
-                extent:<input type="text" name="Brighten" placeholder="1->still" value="0.7"><button onclick="HSVB()">Brightness(HSV)</button>
+                extent:<input type="text" name="Brighten" placeholder="1->still" value="2"><button
+                    onclick="GammaB()">Brighten(Gamma)</button><br>
+                extent:<input type="text" name="Brighten" placeholder="1->still" value="0.7"><button
+                    onclick="HSVB()">Brightness(HSV)</button>
             </div>
             <div class="card">
                 <b>edge extraction:</b><br>
@@ -149,7 +158,8 @@
             </div>
             <div class="card">
                 <b>convolution</b><br>
-                <textarea id="kernel" cols="20" rows="8">[&#10 [-1, 0, 1],&#10 [-2, 0, 2],&#10 [-1, 0, 1]&#10]</textarea>
+                <textarea id="kernel" cols="35"
+                    rows="8">[&#10 [-1, 0, 1],&#10 [-2, 0, 2],&#10 [-1, 0, 1]&#10]</textarea>
                 <button onclick="Convolute()">convolution</button>
             </div>
             <div class="card">
@@ -158,17 +168,33 @@
                 newHeight: <input type="text" name="size" value="-1"><br>
                 <button onclick="resize()">resize</button>
             </div>
+            <div class="card">
+                <b>transform</b><br>
+                The origin is in the lower left corner.<br>
+                <textarea id="transformMat" cols="35"
+                    rows="8">[&#10 [Math.cos(0.1), Math.sin(0.1), 0],&#10 [-Math.sin(0.1), Math.cos(0.1), 0],&#10 [0, 0, 1]&#10]</textarea>
+                <button onclick="transform()">transform</button>
+            </div>
+            <div class="card">
+                <b>perspective</b><br>
+                ↖↗↙↘<br>
+                <textarea id="perspectiveMat" cols="35"
+                    rows="8">[&#10 [-pic.width>>3, -pic.height>>3],&#10 [pic.width,pic.height>>2],&#10 [pic.width>>2,pic.height],&#10 [(pic.width*3)>>2,pic.height]&#10]</textarea>
+                <button onclick="perspective()">perspective</button>
+            </div>
             time used is printed in console.
             <br>
         </div>
-        <div class="showPic">
-            <canvas id="picShow"></canvas>
-            <p id="size"></p>
+        <div class="showPic" onclick="inputImgBtn.click()">
+            <div>
+                <canvas id="picShow"></canvas>
+                <p id="size">click to select a picture</p>
+            </div>
         </div>
     </div>
 </body>
 <script>
-    function origin(){
+    function origin() {
         imgToCanvas(imgsrc)
     }
     function toGrey() {
@@ -180,7 +206,7 @@
     function to01() {
         let threshold = parseInt(document.getElementsByName("Binarization")[0].value);
         console.time('Binarization');
-        convert(imgData, '1',threshold)
+        convert(imgData, '1', threshold)
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('Binarization');
     }
@@ -253,61 +279,61 @@
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('horizontal Line2')
     }
-    function Erosion(){
+    function Erosion() {
         console.time('Erosion')
-        var d = new jsPic().fromImageData(imgData,'L');
+        var d = new jsPic().fromImageData(imgData, 'L');
         imgData = d.erode([
-            [0,0,1,0,0],
-            [0,1,1,1,0],
-            [1,1,0,1,1],
-            [0,1,1,1,0],
-            [0,0,1,0,0]
+            [0, 0, 1, 0, 0],
+            [0, 1, 1, 1, 0],
+            [1, 1, 0, 1, 1],
+            [0, 1, 1, 1, 0],
+            [0, 0, 1, 0, 0]
         ]).toImageData([0, 0, 0, -1]);
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('Erosion')
     }
-    function www(){
+    function www() {
         console.time('Erosion')
-        var d = new jsPic().fromImageData(imgData,'L');
+        var d = new jsPic().fromImageData(imgData, 'L');
         imgData = d.filter2D({
-            kernelSize: [1,5],
-            padding: [0,2],
+            kernelSize: [1, 5],
+            padding: [0, 2],
             select: [0],
-            pixfun: (ker)=>{
-                if(ker[2]<10) return 0;
+            pixfun: (ker) => {
+                if (ker[2] < 10) return 0;
                 return Math.min(...ker);
             }
         }).toImageData([0, 0, 0, -1]);
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('Erosion')
     }
-    function Dilation(){
+    function Dilation() {
         console.time('Dilation')
-        var d = new jsPic().fromImageData(imgData,'L');
-        imgData = d.dilate([[1,1,1],[1,1,1],[1,1,1]]).toImageData([0, 0, 0, -1]);
+        var d = new jsPic().fromImageData(imgData, 'L');
+        imgData = d.dilate([[1, 1, 1], [1, 1, 1], [1, 1, 1]]).toImageData([0, 0, 0, -1]);
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('Dilation')
     }
-    function fillHole(){
+    function fillHole() {
         console.time('fillHole')
-        var d = new jsPic().fromImageData(imgData,'1',127);
+        var d = new jsPic().fromImageData(imgData, '1', 127);
         d.fillHole()
         imgData = d.toImageData([0, 0, 0, -1]);
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('fillHole')
     }
-    function GammaB(){
+    function GammaB() {
         console.time('brighten(HSV)');
         var d = new jsPic().fromImageData(imgData);
-        d.brighten('gamma',parseFloat(document.getElementsByName('Brighten')[0].value));
+        d.brighten('gamma', parseFloat(document.getElementsByName('Brighten')[0].value));
         imgData = d.toImageData([0, 1, 2, -1]);
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('brighten(HSV)');
     }
-    function HSVB(){
+    function HSVB() {
         console.time('brighten(HSV)');
         var d = new jsPic().fromImageData(imgData);
-        d.brighten('hsb',parseFloat(document.getElementsByName('Brighten')[1].value));
+        d.brighten('hsb', parseFloat(document.getElementsByName('Brighten')[1].value));
         imgData = d.toImageData([0, 1, 2, -1]);
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('brighten(HSV)');
@@ -331,7 +357,7 @@
         console.time('houghp');
         var d = new jsPic().fromImageData(imgData, '1');
         let ps = d.HoughP(0, parseFloat(inputs[0].value), parseFloat(inputs[1].value), parseFloat(inputs[2].value), parseFloat(inputs[3].value), parseFloat(inputs[4].value));
-        console.log("result:",ps);
+        console.log("result:", ps);
         let colors = ['#f0f000', '#00ff00', '#00ffff']
         ctx.lineWidth = 3
         for (let i = 0; i < ps.length; i++) {
@@ -344,14 +370,14 @@
         console.log(`find ${ps.length} lines`)
         console.timeEnd('houghp');
     }
-    function Convolute(){
+    function Convolute() {
         var inputs = document.getElementById('kernel').value;
-        inputs = JSON.parse(inputs);
+        inputs = eval(inputs);
         console.time('convolution');
         var d = new jsPic().fromImageData(imgData);
         let setting = {
             kernel: inputs,
-            padding: [Math.floor(inputs[0].length/2), Math.floor(inputs.length/2)],
+            padding: [Math.floor(inputs[0].length / 2), Math.floor(inputs.length / 2)],
             select: [0, 1, 2]
         }
         d = d.convolution(setting);
@@ -359,13 +385,13 @@
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd('convolution')
     }
-    function resize(){
+    function resize() {
         var inputs = document.getElementsByName('size');
         console.time('resize');
         var d = new jsPic().fromImageData(imgData);
         let w = parseInt(inputs[0].value);
         let h = parseInt(inputs[1].value);
-        d = d.resize(w,h);
+        d = d.resize(w, h);
         w = d.width;
         h = d.height;
         imgData = d.toImageData([0, 1, 2, 3]);
@@ -376,16 +402,16 @@
         console.timeEnd('resize')
     }
 
-    function tank(a,b){ // a:black background; b:white background
+    function tank(a, b) { // a:black background; b:white background
         // a.brighten('hsb',1.3,[0]);
         // b.brighten('hsb',0.4,[0]);
         a.channel[1] = a.newChannel();
-        a.paste(0,0,b.copy(0,0,a.width,a.height),(b,l)=>{
-            let alpha = b[0]-l[0]+255;
-            let p = Math.floor(255*b[0]/alpha);
+        a.paste(0, 0, b.copy(0, 0, a.width, a.height), (b, l) => {
+            let alpha = b[0] - l[0] + 255;
+            let p = Math.floor(255 * b[0] / alpha);
             return [p, alpha];
         });
-        imgData = a.toImageData([0,0,0,1]);
+        imgData = a.toImageData([0, 0, 0, 1]);
         ctx.putImageData(imgData, 0, 0);
     }
     function otsuThreshold() {
@@ -410,6 +436,51 @@
         imgData = d.toImageData([0, 0, 0, -1]);
         ctx.putImageData(imgData, 0, 0);
         console.timeEnd("jsPic: adaptiveThreshold");
+    }
+
+    function transform() {
+        const text = document.getElementById('transformMat').value;
+        let mat = eval(text);
+        console.time("jsPic: transform");
+        let pic = new jsPic().fromImageData(imgData, 'RGBA');
+        // {    // 绕y=-x,z=0旋转
+        //     const x = jsPic.mat.mul([
+        //         [1,0,0],
+        //         [0,Math.cos(0.004), Math.sin(0.004)],
+        //         [0,-Math.sin(0.004), Math.cos(0.004)]
+        //     ], jsPic.mat.rotate(-Math.PI/4)
+        //     );
+        //     mat = jsPic.mat.mul(jsPic.mat.rotate(Math.PI/4), x);
+        // }
+        pic = pic.commonCoordTrans(mat);
+        // pic = pic.transform(mat);
+        // pic = pic.rotate(10);
+        imgData = pic.toImageData([0, 1, 2, 3]);
+        c.width = pic.width;
+        c.height = pic.height;
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd("jsPic: transform");
+        document.getElementById('size').innerHTML = `width: ${c.width}, height: ${c.height}`;
+    }
+
+    function perspective() {
+        const text = document.getElementById('perspectiveMat').value;
+        console.time("jsPic: perspective");
+        let pic = new jsPic().fromImageData(imgData, 'RGBA');
+        let mat = eval(text);
+        let m = jsPic.GetPerspectiveTransform([
+            [0, 0],
+            [pic.width, 0],
+            [0, pic.height],
+            [pic.width, pic.height]
+        ], mat);
+        pic = pic.transform(m);
+        imgData = pic.toImageData([0, 1, 2, 3]);
+        c.width = pic.width;
+        c.height = pic.height;
+        ctx.putImageData(imgData, 0, 0);
+        console.timeEnd("jsPic: perspective");
+        document.getElementById('size').innerHTML = `width: ${c.width}, height: ${c.height}`;
     }
 </script>
 
