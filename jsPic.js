@@ -101,6 +101,8 @@ class jsPic {
      * @returns {Array} [channel_1, channel_2, ... ]
      */
     getPixel(x, y) {
+        x = x | 0;
+        y = y | 0;
         let p = new Uint8ClampedArray(this.channel.length);
         for (let i = 0; i < this.channel.length; i++) p[i] = this.channel[i][y][x];
         return p;
@@ -658,6 +660,8 @@ class jsPic {
      * @param {function} picfun how to mix. Inputs are two pixels, return an Array
      */
     paste(x, y, jspic, picfun = (origin,cover)=>cover){
+        x = Math.round(x);
+        y = Math.round(y);
         let h = Math.min(this.height, jspic.height + y);
         let w = Math.min(this.width, jspic.width + x);
         for(let yy=0; y<h; y++, yy++)
