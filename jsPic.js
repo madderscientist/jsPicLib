@@ -28,22 +28,25 @@ class jsPic {
     static Laplacian = [[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]];
     /**
      * normalized Gaussian kernel
-     * @param {number} n 尺寸
+     * @param {number} w width or size
+     * @param {number} h height (if h is not given, h will be set as w)
      * @returns {Array<Array>} 2D square array
      */
-    static GaussianKernel(n) {
-        let kernel = new Array(n);
+    static GaussianKernel(w, h = -1) {
+        if(h <= 0) h = w;
+        let kernel = new Array(h);
         let sum = 0;
-        let c = n >> 1;
-        for (let i = 0; i < n; i++) {
-            kernel[i] = new Array(n);
-            for (let j = 0; j < n; j++) {
-                kernel[i][j] = Math.exp(-((i - c) ** 2 + (j - c) ** 2) / 2);
+        const cw = w >> 1;
+        const ch = h >> 1;
+        for (let i = 0; i < h; i++) {
+            kernel[i] = new Array(w);
+            for (let j = 0; j < w; j++) {
+                kernel[i][j] = Math.exp(-((i - ch) ** 2 + (j - cw) ** 2) / 2);
                 sum += kernel[i][j];
             }
         }
-        for (let i = 0; i < n; i++)
-            for (let j = 0; j < n; j++)
+        for (let i = 0; i < h; i++)
+            for (let j = 0; j < w; j++)
                 kernel[i][j] /= sum;
         return kernel;
     }
